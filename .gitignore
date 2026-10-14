@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+# copias de seguridad de partidas personales
+backups/
+dist/
+build/
+build.log
+.pytest_cache/

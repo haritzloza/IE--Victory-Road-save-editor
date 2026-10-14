@@ -1,0 +1,41 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest -q tests
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    # oldest supported runner -> binary runs on more distros (glibc compatibility)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m venv .venv
+          .venv/bin/pip install -q -r requirements.txt -r requirements-dev.txt
+          ./build.sh
+          mv dist/ievr-save-editor dist/ievr-save-editor-linux-x86_64
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/ievr-save-editor-linux-x86_64
+          generate_release_notes: true
