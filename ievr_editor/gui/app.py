@@ -1,4 +1,6 @@
 """Qt GUI for the IEVR save editor."""
+import locale
+import os
 import re
 import struct
 import subprocess
@@ -15,12 +17,13 @@ from PySide6.QtWidgets import (
 )
 
 from .. import catalog as catalog_mod
+from .. import config
 from .. import l5bin
 from ..catalog import CHRONICLE_DIFFICULTY_NAMES
 from ..editor import Editor
-from ..gamedata import GameData
+from ..gamedata import GameData, find_game_dir, is_game_dir
 from ..players import EQUIP_SLOTS, MAX_LEVEL, SKILL_SLOTS, Squad
-from ..savefile import USERDATA_NAME, SaveFile, find_save_dirs
+from ..savefile import USERDATA_NAME, SaveFile, describe_save_dir, find_save_dirs
 from . import theme
 from .tablemodel import Column, FilterProxy, RowModel, SpinDelegate
 
@@ -1001,8 +1004,11 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence.Find, self, self.focus_search)
         for i in range(len(NAV)):
             QShortcut(QKeySequence(f'Ctrl+{i + 1}'), self, lambda i=i: self.go(i))
+        self.update_title()
 
     def go(self, i):
+        if not self.state:
+            return
         self.nav_buttons[i].setChecked(True)
         self.stack.setCurrentIndex(i)
         self.stack.currentWidget().refresh()
@@ -1020,6 +1026,9 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, 'Error', f'No se pudo abrir el guardado:\n{e}')
             return
         self.state = State(save, self.cat)
+        config.set('last_save_dir', str(Path(path).resolve().parent))
+        for b in self.nav_buttons:
+            b.setEnabled(True)
         while self.stack.count():
             w = self.stack.widget(0)
             self.stack.removeWidget(w)
@@ -1036,6 +1045,11 @@ class MainWindow(QMainWindow):
         info = self.state.info()
         who = f"{info.get('name', '')} «{info.get('nick', '')}»\n" if info.get('name') else ''
         self.player.setText(f'{who}{Path(self.path).name}')
+
+    def show_welcome(self):
+        self.stack.addWidget(WelcomePage(self))
+        for b in self.nav_buttons:
+            b.setEnabled(False)
 
     def open_dialog(self):
         if not self.confirm_discard():
@@ -1099,29 +1113,105 @@ class Splash(QFrame):
         lay.addWidget(bar)
 
 
+def pick_game_dir():
+    """Ask for the game folder until a valid one is chosen; remembered in the config."""
+    msg = ('No se ha encontrado INAZUMA ELEVEN Victory Road en tus bibliotecas de Steam.\n\n'
+           'Selecciona la carpeta del juego (la que contiene «nie.exe» y la carpeta «data»), normalmente:\n'
+           '…/steamapps/common/INAZUMA ELEVEN Victory Road')
+    QMessageBox.information(None, 'Juego no encontrado', msg)
+    while True:
+        d = QFileDialog.getExistingDirectory(None, 'Carpeta de INAZUMA ELEVEN Victory Road', str(Path.home()))
+        if not d:
+            return None
+        if is_game_dir(d):
+            config.set('game_dir', d)
+            return d
+        QMessageBox.warning(None, 'Carpeta incorrecta',
+                            f'«{d}» no parece la carpeta del juego (falta data/cpk_list.cfg.bin).')
+
+
+def text_language(gd):
+    """Language of item/character names: config, then system locale, then English/Spanish."""
+    langs = gd.languages()
+    pref = config.get('language') or locale.getlocale()[0] or os.environ.get('LANG', '')
+    pref = (pref or '').split('_')[0].split('.')[0].lower()
+    for cand in (pref, 'es', 'en'):
+        if cand in langs:
+            return cand
+    return langs[0] if langs else 'en'
+
+
+def choose_save(parent=None):
+    """Path of the save to open: the only one, or let the user pick between Steam accounts."""
+    dirs = find_save_dirs()
+    if not dirs:
+        return None
+    if len(dirs) == 1:
+        return dirs[0] / USERDATA_NAME
+    labels = [describe_save_dir(d) for d in dirs]
+    last = config.get('last_save_dir')
+    current = next((i for i, d in enumerate(dirs) if str(d) == last), 0)
+    choice, ok = QInputDialog.getItem(parent, 'Elegir partida', 'Hay varias cuentas de Steam con partida:',
+                                      labels, current, False)
+    if not ok:
+        return None
+    d = dirs[labels.index(choice)]
+    config.set('last_save_dir', str(d))
+    return d / USERDATA_NAME
+
+
+class WelcomePage(Page):
+    def __init__(self, win):
+        super().__init__('No se ha encontrado ninguna partida',
+                         'El editor busca en ~/.local/share/Steam/userdata/<cuenta>/2799860/remote/')
+        card = QFrame()
+        card.setObjectName('Card')
+        v = QVBoxLayout(card)
+        v.setContentsMargins(24, 20, 24, 20)
+        v.setSpacing(10)
+        for line in ('1. Abre el juego en Steam y guarda la partida al menos una vez.',
+                     '2. Cierra el juego y vuelve a abrir el editor.',
+                     '3. Si tu partida está en otro sitio, ábrela a mano con el botón de abajo '
+                     f'(el archivo se llama «{USERDATA_NAME}»).'):
+            l = QLabel(line)
+            l.setWordWrap(True)
+            l.setStyleSheet('background: transparent;')
+            v.addWidget(l)
+        b = QPushButton('📂  Abrir partida…')
+        b.setObjectName('Primary')
+        b.clicked.connect(win.open_dialog)
+        v.addWidget(b, 0, Qt.AlignLeft)
+        self.lay.addWidget(card)
+        self.lay.addStretch()
+
+
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName('IEVR Save Editor')
     app.setDesktopFileName('ievr-save-editor')
     app.setWindowIcon(QIcon(str(Path(__file__).resolve().parent.parent / 'data' / 'icon.png')))
     theme.apply(app)
-    try:
-        gd = GameData()
-    except FileNotFoundError:
-        d = QFileDialog.getExistingDirectory(None, 'Selecciona la carpeta de INAZUMA ELEVEN Victory Road')
-        if not d:
-            return 1
-        gd = GameData(d)
+    game_dir = find_game_dir() or pick_game_dir()
+    if not game_dir:
+        return 1
     splash = Splash()
     splash.show()
     app.processEvents()
-    cat = catalog_mod.build(gd)
+    try:
+        gd = GameData(game_dir)
+        cat = catalog_mod.build(gd, text_language(gd))
+    except Exception as e:  # unexpected game data (new game version, broken install…)
+        splash.close()
+        QMessageBox.critical(None, 'Error leyendo el juego',
+                             f'No se pudieron leer los datos del juego en:\n{game_dir}\n\n{type(e).__name__}: {e}\n\n'
+                             'Si el juego se ha actualizado hace poco, puede que el editor necesite una actualización.')
+        return 1
     win = MainWindow(cat)
-    dirs = find_save_dirs()
-    if len(sys.argv) > 1:
-        win.open(sys.argv[1])
-    elif dirs:
-        win.open(dirs[0] / USERDATA_NAME)
     splash.close()
     win.show()
+    path = sys.argv[1] if len(sys.argv) > 1 else choose_save(win)
+    if path:
+        win.open(path)
+    else:
+        win.show_welcome()
     return app.exec()

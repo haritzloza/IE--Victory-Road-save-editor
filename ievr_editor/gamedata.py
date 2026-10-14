@@ -10,7 +10,7 @@ import struct
 import zlib
 from pathlib import Path
 
-from . import cpk, rdbn, t2b
+from . import config, cpk, rdbn, steam, t2b
 
 GAME_DIR_NAME = 'INAZUMA ELEVEN Victory Road'
 
@@ -27,28 +27,18 @@ def _reveal(seed_words):
     return crypto.xor(b''.join(struct.pack('<I', w) for w in words), seed)
 
 
-def _steam_library_dirs():
-    roots = [Path.home() / '.local/share/Steam', Path.home() / '.steam/steam',
-             Path.home() / '.var/app/com.valvesoftware.Steam/.local/share/Steam']
-    seen = []
-    for r in roots:
-        vdf = r / 'steamapps/libraryfolders.vdf'
-        if vdf.exists():
-            for p in re.findall(r'"path"\s+"([^"]+)"', vdf.read_text(errors='replace')):
-                if Path(p) not in seen:
-                    seen.append(Path(p))
-        if r.exists() and r not in seen:
-            seen.append(r)
-    return seen
+def is_game_dir(d) -> bool:
+    return d is not None and (Path(d) / 'data/cpk_list.cfg.bin').is_file()
 
 
 def find_game_dir():
-    env = os.environ.get('IEVR_GAME_DIR')
-    if env:
-        return Path(env)
-    for lib in _steam_library_dirs():
+    """Game install dir: $IEVR_GAME_DIR, the folder saved in the config, or Steam libraries."""
+    for d in (os.environ.get('IEVR_GAME_DIR'), config.get('game_dir')):
+        if d and is_game_dir(d):
+            return Path(d)
+    for lib in steam.library_dirs():
         d = lib / 'steamapps/common' / GAME_DIR_NAME
-        if (d / 'data/cpk_list.cfg.bin').exists():
+        if is_game_dir(d):
             return d
     return None
 
@@ -60,7 +50,7 @@ def _version_key(name):
 class GameData:
     def __init__(self, game_dir=None):
         self.game_dir = Path(game_dir) if game_dir else find_game_dir()
-        if not self.game_dir:
+        if not is_game_dir(self.game_dir):
             raise FileNotFoundError('INAZUMA ELEVEN Victory Road install not found')
         raw = (self.game_dir / 'data/cpk_list.cfg.bin').read_bytes()
         build = f'{zlib.crc32(raw):08x}'
@@ -108,10 +98,17 @@ class GameData:
             return rdbn.parse(data)
         return t2b.parse(data)
 
+    def languages(self):
+        return sorted({p.split('/')[3] for p in self.index
+                       if p.startswith('data/common/text/') and p.endswith('/item_text.cfg.bin')})
+
     def texts(self, name, lang='es'):
         """id -> text for NOUN_INFO (variant 0) and TEXT_INFO entries of a text table."""
         out = {}
-        for e in t2b.parse(self.read(f'data/common/text/{lang}/{name}.cfg.bin')):
+        path = f'data/common/text/{lang}/{name}.cfg.bin'
+        if path not in self.index:
+            path = f'data/common/text/en/{name}.cfg.bin'
+        for e in t2b.parse(self.read(path)):
             if e.name == 'NOUN_INFO' and e.raw[1] == 0:
                 txt = next((x for x in e.values[2:10] if isinstance(x, str) and x), None)
                 if txt:

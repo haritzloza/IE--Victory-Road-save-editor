@@ -4,7 +4,7 @@ import shutil
 import time
 from pathlib import Path
 
-from . import container, l5bin
+from . import container, l5bin, steam
 
 APP_ID = 2799860
 USERDATA_NAME = '002AB8F4-USERDATALIVE'
@@ -14,15 +14,21 @@ SYSTEM_NAME = '002AB8F4-SYSTEMLIVE'
 
 def find_save_dirs():
     """All Steam ``userdata/<account>/2799860/remote`` dirs holding a save."""
-    roots = [Path.home() / '.local/share/Steam', Path.home() / '.steam/steam',
-             Path.home() / '.var/app/com.valvesoftware.Steam/.local/share/Steam']
     found = []
-    for r in roots:
-        for d in glob.glob(str(r / 'userdata/*' / str(APP_ID) / 'remote')):
+    for root in steam.steam_roots():
+        for d in sorted(glob.glob(str(root / 'userdata/*' / str(APP_ID) / 'remote'))):
             d = Path(d).resolve()
             if (d / USERDATA_NAME).exists() and d not in found:
                 found.append(d)
     return found
+
+
+def describe_save_dir(d: Path) -> str:
+    """Human label for a save dir: Steam persona name, account id and last save time."""
+    account = d.parent.parent.name
+    name = steam.account_names().get(int(account)) if account.isdigit() else None
+    when = time.strftime('%d/%m/%Y %H:%M', time.localtime((d / USERDATA_NAME).stat().st_mtime))
+    return f'{name or "Cuenta"} ({account}) · guardado {when}'
 
 
 class SaveFile:

@@ -44,8 +44,14 @@ Los nombres de objetos, personajes y técnicas se leen **de tu propia instalaci�
 ## Uso
 
 1. **Cierra el juego** (el editor se niega a guardar si sigue abierto).
-2. Abre el editor: detecta solo la partida
-   (`~/.local/share/Steam/userdata/<id>/2799860/remote/002AB8F4-USERDATALIVE`) y el juego.
+2. Abre el editor. No hay que configurar nada:
+   - Encuentra la partida en `Steam/userdata/<cuenta>/2799860/remote/002AB8F4-USERDATALIVE`
+     (Steam normal, Steam Deck, Flatpak y Snap). Si hay **varias cuentas de Steam**, pregunta
+     cuál abrir mostrando el nombre de cada una.
+   - Encuentra el juego en cualquiera de tus bibliotecas de Steam. Si no lo encuentra, te pide
+     la carpeta una vez y la recuerda (`~/.config/ievr-editor/config.json`).
+   - Los nombres de objetos y personajes salen en el idioma de tu sistema si el juego lo
+     tiene (español, inglés, francés, alemán, italiano, portugués…); la interfaz está en español.
 3. Edita y pulsa **Guardar** (`Ctrl+S`). La partida anterior se copia en
    `~/.local/share/ievr-editor/backups/` (se guardan las 20 últimas).
 4. Si al abrir el juego Steam avisa de un conflicto de Steam Cloud, elige la versión **de este equipo**.
