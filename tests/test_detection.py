@@ -12,6 +12,7 @@ def home(tmp_path, monkeypatch):
     monkeypatch.setenv('XDG_CONFIG_HOME', str(tmp_path / '.config'))
     monkeypatch.delenv('IEVR_GAME_DIR', raising=False)
     monkeypatch.setattr(config, 'PATH', tmp_path / '.config/ievr-editor/config.json')
+    monkeypatch.setattr(steam, '_windows_roots', lambda: [])  # ignore a real Steam on Windows runners
     return tmp_path
 
 

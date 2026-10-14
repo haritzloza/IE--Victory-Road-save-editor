@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QPropertyAnimation, Qt, QTimer
+from PySide6.QtCore import QPropertyAnimation, QSize, Qt, QTimer
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
@@ -17,19 +17,22 @@ from PySide6.QtWidgets import (
 )
 
 from .. import catalog as catalog_mod
-from .. import config
+from .. import config, paths
 from .. import l5bin
 from ..catalog import CHRONICLE_DIFFICULTY_NAMES
 from ..editor import Editor
 from ..gamedata import GameData, find_game_dir, is_game_dir
+from ..icons import IconStore
 from ..players import EQUIP_SLOTS, MAX_LEVEL, SKILL_SLOTS, Squad
 from ..savefile import USERDATA_NAME, SaveFile, describe_save_dir, find_save_dirs
 from . import theme
+from .iconloader import IconLoader
 from .tablemodel import Column, FilterProxy, RowModel, SpinDelegate
 
 SPIRIT_TIERS = ['Verde', 'Azul', 'Morado', 'Amarillo', 'Leyenda']
 DIFFICULTY_SHORT = ['Crónica', 'Desbloqueo', 'Obj. inusuales', 'Heroica', 'Heroica+', 'Legendaria']
 KIND_LABEL = {'normal': 'Normal', 'hero': 'Héroe', 'basara': 'Basara'}
+AVATAR_ICON = 'file:icon_ava_face00'  # generic avatar face from the avatar creator
 # charaRarity values; 0-4 follow the spirit colours, 5-7 are hero ("ídolo") cards
 PLAYER_RARITY = ['Verde', 'Azul', 'Morado', 'Amarillo', 'Leyenda', 'Ídolo rojo', 'Ídolo gris', 'Ídolo rosa',
                  'Diamante']
@@ -41,8 +44,17 @@ def rarity_color(r):
 
 
 def game_running() -> bool:
-    out = subprocess.run(['ps', '-eo', 'comm'], capture_output=True, text=True).stdout
-    return any(line.strip().lower() in ('nie.exe', 'eaclauncher.exe') for line in out.splitlines())
+    """Whether the game (or its EAC launcher) is running; under Proton it shows up as nie.exe too."""
+    try:
+        if sys.platform == 'win32':
+            out = subprocess.run(['tasklist', '/FO', 'CSV', '/NH'], capture_output=True, text=True,
+                                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout
+            names = [line.split(',')[0].strip('"') for line in out.splitlines()]
+        else:
+            names = subprocess.run(['ps', '-eo', 'comm'], capture_output=True, text=True).stdout.splitlines()
+    except OSError:
+        return False
+    return any(n.strip().lower() in ('nie.exe', 'eaclauncher.exe') for n in names)
 
 
 # ------------------------------------------------------------------------- state
@@ -203,7 +215,12 @@ class TablePage(Page):
         self.view.setShowGrid(False)
         self.view.setWordWrap(False)
         self.view.verticalHeader().setVisible(False)
-        self.view.verticalHeader().setDefaultSectionSize(38)
+        self.view.verticalHeader().setDefaultSectionSize(44)
+        self.view.setIconSize(QSize(34, 34))
+        win = getattr(self, 'win', None)
+        if win is not None and win.icons is not None:
+            self.model.icons = win.icons
+            win.icons.ready.connect(lambda _key: self.view.viewport().update())
         self.view.horizontalHeader().setHighlightSections(False)
         self.view.setItemDelegate(SpinDelegate(self.model, self.proxy, self.view))
         self.view.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed |
@@ -277,7 +294,7 @@ class ItemsPage(TablePage):
         st = lambda: win.state
         accent_if = lambda it: theme.ACCENT if st().owned.get(it.id, 0) else theme.TEXT_DIM
         cols = [
-            Column('Nombre', lambda it: it.name),
+            Column('Nombre', lambda it: it.name, icon=lambda it: it.icon),
             Column('Tipo', lambda it: it.kind, fg=lambda it: theme.TEXT_DIM),
             Column('Cantidad', lambda it: st().owned.get(it.id, 0), lambda it, v: st().set_item(it, int(v)),
                    maximum=lambda it: max(it.max_stack, 1), fg=accent_if, bold=True),
@@ -370,7 +387,7 @@ class SpiritsPage(TablePage):
 
         def name(s):
             return s.name + (f'  · {s.variant + 1}' if s.kind != 'normal' and win.state.cat.variants(s) > 1 else '')
-        cols = [Column('Nombre', name),
+        cols = [Column('Nombre', name, icon=lambda s: s.face),
                 Column('Tipo', lambda s: KIND_LABEL[s.kind], fg=lambda s: theme.KIND_COLORS[KIND_LABEL[s.kind]]),
                 Column('Elemento', lambda s: s.element, fg=lambda s: theme.ELEMENT_COLORS.get(s.element)),
                 Column('Pos.', lambda s: s.position, center=True)]
@@ -382,12 +399,12 @@ class SpiritsPage(TablePage):
                 lambda s, v, t=t: None if (t and s.kind != 'normal') else st().set_spirit(s, int(v), t),
                 maximum=lambda s: 9999, header_color=color, bold=True, center=True,
                 fg=lambda s, t=t, color=color: color if st().spirit_count(s, t) else theme.SURFACE_3))
-        cols.append(Column('Descripción', lambda s: s.desc, fg=lambda s: theme.TEXT_DIM))
-        super().__init__('Espíritus', 'Normales por rareza, héroe y basara · doble clic en una cantidad para editarla',
+        super().__init__('Espíritus', 'Normales por rareza, héroe y basara · doble clic en una cantidad para editarla · '
+                                      'pasa el ratón por encima para ver la descripción',
                          cols, win.mark_dirty)
         hh = self.view.horizontalHeader()
-        hh.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        hh.setSectionResizeMode(len(cols) - 1, QHeaderView.Stretch)
+        # fixed width: resizing to contents would ask every row for its icon
+        hh.setSectionResizeMode(0, QHeaderView.Stretch)
         self.kind = None
         self.only_owned = None
         self.add_chips([('Todos', None), ('Normales', 'normal'), ('Héroe', 'hero'), ('Basara', 'basara')],
@@ -536,8 +553,9 @@ def item_model(items):
     empty.setData(0, Qt.UserRole)
     m.appendRow(empty)
     for it in sorted(items, key=lambda it: it.name):
-        si = QStandardItem(f'{it.name}   · {it.kind}' if it.category == 'SPECIAL_SKILL' else it.name)
+        si = QStandardItem(it.name)
         si.setData(it.id, Qt.UserRole)
+        si.setToolTip(it.kind)
         m.appendRow(si)
     return m
 
@@ -567,12 +585,26 @@ class PlayerPanel(QFrame):
         scroll.setWidget(inner)
         outer.addWidget(scroll)
 
+        self.face = QLabel()
+        self.face.setFixedSize(96, 96)
+        self.face.setAlignment(Qt.AlignCenter)
+        self.face.setStyleSheet(f'background: {theme.SURFACE_2}; border-radius: 48px;')
         self.title = label('Selecciona un jugador', 'PageTitle')
         self.title.setStyleSheet('font-size: 15pt;')
         self.title.setWordWrap(True)
         self.subtitle = label('', 'CardLabel')
-        lay.addWidget(self.title)
-        lay.addWidget(self.subtitle)
+        head = QHBoxLayout()
+        head.setSpacing(14)
+        head.addWidget(self.face)
+        names = QVBoxLayout()
+        names.addStretch()
+        names.addWidget(self.title)
+        names.addWidget(self.subtitle)
+        names.addStretch()
+        head.addLayout(names, 1)
+        lay.addLayout(head)
+        self.icon_labels = {}
+        page.win.icons.ready.connect(lambda _k: self.refresh_icons())
 
         form = QFormLayout()
         form.setHorizontalSpacing(14)
@@ -597,7 +629,7 @@ class PlayerPanel(QFrame):
             cb = SearchCombo(item_model(items))
             cb.activated.connect(lambda _=0, f=field, cb=cb: self.equip_changed(f, cb))
             self.equip[field] = cb
-            form.addRow(title, cb)
+            form.addRow(title, self.with_icon(field, cb))
         lay.addLayout(form)
 
         lay.addSpacing(8)
@@ -614,10 +646,36 @@ class PlayerPanel(QFrame):
             cb = SearchCombo(model)
             cb.activated.connect(lambda _=0, f=field, cb=cb: self.tech_changed(f, cb))
             self.tech[field] = cb
-            form.addRow(title, cb)
+            form.addRow(title, self.with_icon(field, cb))
         lay.addLayout(form)
         lay.addStretch()
         self.setEnabled(False)
+
+    def with_icon(self, field, combo):
+        w = QWidget()
+        w.setStyleSheet('background: transparent;')
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(8)
+        icon = QLabel()
+        icon.setFixedSize(30, 30)
+        icon.setStyleSheet('background: transparent;')
+        self.icon_labels[field] = (icon, combo)
+        h.addWidget(icon)
+        h.addWidget(combo, 1)
+        return w
+
+    def refresh_icons(self):
+        icons = self.page.win.icons
+        cat = self.page.win.state.cat
+        for field, (lbl, combo) in self.icon_labels.items():
+            it = cat.items.get(combo.currentData() or 0)
+            pm = icons.pixmap(it.icon, 30) if it else None
+            lbl.setPixmap(pm) if pm else lbl.clear()
+        p = self.player
+        key = (cat.chara_faces.get(p.param_id) or (AVATAR_ICON if p.is_avatar else '')) if p else ''
+        pm = icons.pixmap(key, 88) if key else None
+        self.face.setPixmap(pm) if pm else self.face.clear()
 
     def show_player(self, p):
         self.player = p
@@ -625,6 +683,7 @@ class PlayerPanel(QFrame):
         if p is None:
             self.title.setText('Selecciona un jugador')
             self.subtitle.setText('')
+            self.refresh_icons()
             return
         self.loading = True
         sq = self.page.squad
@@ -639,6 +698,7 @@ class PlayerPanel(QFrame):
         for f, cb in self.tech.items():
             cb.set_item(sq.equipped_item(te[f]))
         self.loading = False
+        self.refresh_icons()
 
     def level_changed(self, v):
         if not self.loading and self.player:
@@ -654,11 +714,13 @@ class PlayerPanel(QFrame):
         if self.player:
             self.page.squad.set_equipment(self.player, field, cb.currentData())
             self.page.edited(inventory=True)
+            self.refresh_icons()
 
     def tech_changed(self, field, cb):
         if self.player:
             self.page.squad.set_technique(self.player, field, cb.currentData())
             self.page.edited(inventory=True)
+            self.refresh_icons()
 
 
 class PlayersPage(TablePage):
@@ -666,7 +728,8 @@ class PlayersPage(TablePage):
         self.win = win
         self.squad = Squad(win.state.editor)
         cols = [
-            Column('Nombre', self.player_name, bold=True),
+            Column('Nombre', self.player_name, bold=True,
+                   icon=lambda p: win.state.cat.chara_faces.get(p.param_id, AVATAR_ICON if p.is_avatar else '')),
             Column('Elemento', lambda p: self.spirit_attr(p, 'element'),
                    fg=lambda p: theme.ELEMENT_COLORS.get(self.spirit_attr(p, 'element'))),
             Column('Pos.', lambda p: self.spirit_attr(p, 'position'), center=True),
@@ -947,9 +1010,10 @@ NAV = ['🏠  Resumen', '⚽  Jugadores', '🎒  Objetos', '🔥  Técnicas', '�
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, cat):
+    def __init__(self, cat, icons=None):
         super().__init__()
         self.cat = cat
+        self.icons = icons
         self.state = None
         self.setWindowTitle('IEVR Save Editor')
         self.resize(1360, 860)
@@ -965,7 +1029,7 @@ class MainWindow(QMainWindow):
         sl.setContentsMargins(0, 0, 0, 16)
         sl.setSpacing(2)
         sl.addWidget(label('⚡ Victory Road', 'Brand'))
-        sl.addWidget(label('Save Editor para Linux', 'BrandSub'))
+        sl.addWidget(label('Save Editor', 'BrandSub'))
         self.nav = QButtonGroup(self)
         self.nav_buttons = []
         for i, text in enumerate(NAV):
@@ -1085,7 +1149,7 @@ class MainWindow(QMainWindow):
             return
         self.state.dirty = False
         self.update_title()
-        self.toast.show_message('✔  Guardado · copia del anterior en ~/.local/share/ievr-editor/backups')
+        self.toast.show_message(f'✔  Guardado · copia del anterior en {paths.backup_dir()}')
 
     def confirm_discard(self):
         if not self.state or not self.state.dirty:
@@ -1206,7 +1270,7 @@ def main():
                              f'No se pudieron leer los datos del juego en:\n{game_dir}\n\n{type(e).__name__}: {e}\n\n'
                              'Si el juego se ha actualizado hace poco, puede que el editor necesite una actualización.')
         return 1
-    win = MainWindow(cat)
+    win = MainWindow(cat, IconLoader(IconStore(gd)))
     splash.close()
     win.show()
     path = sys.argv[1] if len(sys.argv) > 1 else choose_save(win)

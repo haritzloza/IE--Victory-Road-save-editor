@@ -1,8 +1,8 @@
-# IEVR Save Editor (Linux)
+# IEVR Save Editor
 
-Editor de partidas de **INAZUMA ELEVEN: Victory Road** (Steam) para Linux, con interfaz
-gráfica. Edita el archivo de guardado con el juego cerrado: no toca la memoria del juego
-ni el anticheat.
+Editor de partidas de **INAZUMA ELEVEN: Victory Road** (Steam) para **Linux y Windows**, con
+interfaz gráfica, iconos de objetos y caras de personajes. Edita el archivo de guardado con el
+juego cerrado: no toca la memoria del juego ni el anticheat.
 
 > *English summary below.*
 
@@ -24,39 +24,50 @@ ni el anticheat.
 
 ⚗️ = experimental: funciona sobre el formato, pero aún no se ha comprobado a fondo en el juego.
 
+Las tablas muestran el **icono de cada objeto** (equipamiento, consumibles, equipaciones, ropa,
+emblemas, keshins…) y la **cara de cada jugador y espíritu**, sacados de tu instalación del juego.
+
 Los nombres de objetos, personajes y técnicas se leen **de tu propia instalación del juego**
 (en español); el editor no incluye ningún archivo del juego.
 
 ## Instalación
 
-**Ejecutable:** descarga `ievr-save-editor-linux-x86_64` de
-[Releases](../../releases), dale permisos (`chmod +x`) y ábrelo.
+Descarga el ejecutable de [Releases](../../releases):
+
+- **Windows:** `ievr-save-editor-windows-x64.exe` y ábrelo. Windows SmartScreen puede avisar
+  porque el ejecutable no está firmado: «Más información» → «Ejecutar de todas formas».
+- **Linux / Steam Deck:** `ievr-save-editor-linux-x86_64`, dale permisos (`chmod +x`) y ábrelo.
 
 **Desde el código** (Python 3.12 o superior):
 
 ```sh
-./build.sh      # compila dist/ievr-save-editor (un único ejecutable)
-./install.sh    # lo copia a ~/.local/bin y lo añade al menú de aplicaciones
+pip install -r requirements.txt -r requirements-dev.txt
+python build.py          # compila dist/ievr-save-editor(.exe), un único ejecutable
+python -m ievr_editor    # o ejecútalo directamente sin compilar
 ```
 
-`./install.sh --uninstall` lo quita. Para ejecutarlo sin compilar: `./ievr-editor.sh`.
+En Linux, `./build.sh` y `./install.sh` lo compilan y lo añaden al menú de aplicaciones
+(`./install.sh --uninstall` lo quita).
 
 ## Uso
 
 1. **Cierra el juego** (el editor se niega a guardar si sigue abierto).
 2. Abre el editor. No hay que configurar nada:
    - Encuentra la partida en `Steam/userdata/<cuenta>/2799860/remote/002AB8F4-USERDATALIVE`
-     (Steam normal, Steam Deck, Flatpak y Snap). Si hay **varias cuentas de Steam**, pregunta
+     (Windows, Linux, Steam Deck, Flatpak y Snap). Si hay **varias cuentas de Steam**, pregunta
      cuál abrir mostrando el nombre de cada una.
    - Encuentra el juego en cualquiera de tus bibliotecas de Steam. Si no lo encuentra, te pide
-     la carpeta una vez y la recuerda (`~/.config/ievr-editor/config.json`).
+     la carpeta una vez y la recuerda.
    - Los nombres de objetos y personajes salen en el idioma de tu sistema si el juego lo
      tiene (español, inglés, francés, alemán, italiano, portugués…); la interfaz está en español.
-3. Edita y pulsa **Guardar** (`Ctrl+S`). La partida anterior se copia en
-   `~/.local/share/ievr-editor/backups/` (se guardan las 20 últimas).
+3. Edita y pulsa **Guardar** (`Ctrl+S`). La partida anterior se copia en la carpeta de copias
+   (se guardan las 20 últimas):
+   - Linux: `~/.local/share/ievr-editor/backups/`
+   - Windows: `%LOCALAPPDATA%\ievr-editor\backups\`
 4. Si al abrir el juego Steam avisa de un conflicto de Steam Cloud, elige la versión **de este equipo**.
 
-Probado con la versión 7.1.2 del juego en Steam (Proton).
+Probado con la versión 7.1.2 del juego en Steam bajo Linux (Proton). La versión de Windows
+usa el mismo código y pasa los tests en Windows, pero aún no se ha probado con una partida real.
 
 ## Cómo funciona
 
@@ -68,6 +79,7 @@ El formato se ha obtenido por ingeniería inversa del ejecutable del juego.
 | `container.py` | Contenedor de la partida de Steam (cabecera, entradas, CRCs) |
 | `l5bin.py` | Árbol binario etiquetado de LEVEL-5 dentro de la partida (lectura/escritura sin pérdidas) |
 | `cpk.py`, `t2b.py`, `rdbn.py` | Lectura de los datos del juego (CPK de CRI con CRILAYLA, tablas `.cfg.bin`) |
+| `g4tx.py`, `icons.py` | Texturas G4TX (DDS/BC7) → iconos PNG en caché |
 | `gamedata.py`, `catalog.py` | Índice `cpk_list` y catálogo de todo lo obtenible |
 | `editor.py`, `players.py` | Operaciones sobre la partida |
 | `gui/` | Interfaz Qt (PySide6) |
@@ -79,6 +91,7 @@ Tests: `python -m pytest tests` (usan datos sintéticos, no hacen falta partidas
 - [Viola](https://github.com/SuperTavor/Viola) (SuperTavor) y
   [ievr_cfg_bin_editor](https://github.com/Telmo26/ievr_cfg_bin_editor) (Telmo26):
   referencia para los formatos CPK y RDBN.
+- [Kuriimu2](https://github.com/FanTranslatorsInternational/Kuriimu2): estructura del formato G4TX.
 - Formato T2B basado en el trabajo de la comunidad de LEVEL-5 (Tiniifan, onepiecefreak3, Togenyan).
 
 ## Licencia
@@ -89,7 +102,8 @@ Tests: `python -m pytest tests` (usan datos sintéticos, no hacen falta partidas
 
 ## English summary
 
-Linux save editor (Qt GUI) for **INAZUMA ELEVEN: Victory Road** on Steam. It edits the save
+Save editor (Qt GUI, Linux and Windows) for **INAZUMA ELEVEN: Victory Road** on Steam, with item
+icons and character faces. It edits the save
 file while the game is closed: players (level, rarity, equipment, equipped techniques),
 inventory, super techniques/keshins/miximax, spirits, Chronicle mode progress, avatar name.
 Item and character names are read from your own game install. The UI is in Spanish.

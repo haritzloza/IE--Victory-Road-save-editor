@@ -4,7 +4,7 @@ import shutil
 import time
 from pathlib import Path
 
-from . import container, l5bin, steam
+from . import container, l5bin, paths, steam
 
 APP_ID = 2799860
 USERDATA_NAME = '002AB8F4-USERDATALIVE'
@@ -63,7 +63,7 @@ class SaveFile:
         container.Container.load(data)  # sanity check before touching the disk
         if target.exists():
             # keep backups out of the Steam Cloud folder
-            bdir = Path(backup_dir) if backup_dir else Path.home() / '.local/share/ievr-editor/backups'
+            bdir = Path(backup_dir) if backup_dir else paths.backup_dir()
             bdir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(target, bdir / f'{target.name}.{time.strftime("%Y%m%d-%H%M%S")}')
             for old in sorted(bdir.glob(f'{target.name}.*'))[:-MAX_BACKUPS]:

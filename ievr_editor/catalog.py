@@ -63,6 +63,7 @@ class Item:
     array: str
     kind: str = ''         # finer kind for skills
     desc: str = ''
+    icon: str = ''         # icons.IconStore key
 
 
 @dataclass
@@ -75,6 +76,7 @@ class Spirit:
     element: str = ''
     position: str = ''
     desc: str = ''
+    face: str = ''         # icons.IconStore key
 
 
 @dataclass
@@ -94,6 +96,7 @@ class Catalog:
     chronicle: List[ChronicleMatch] = field(default_factory=list)
     chara_names: Dict[int, str] = field(default_factory=dict)   # param id -> name
     chara_flag_index: Dict[int, int] = field(default_factory=dict)  # param id -> database flag bit
+    chara_faces: Dict[int, str] = field(default_factory=dict)  # param id -> face icon key
 
     def variants(self, sp: Spirit) -> int:
         """How many spirit cards of the same kind share this character's name."""
@@ -117,9 +120,12 @@ def build(g: GameData, lang='es') -> Catalog:
     skill_names = {}
     for r in g.table(SKILL_DIR, 'skill_config_')['m_skillInfoList']:
         skill_names[r['skillID']] = skill_text.get(r['skillNameId'])
+    keshin_icons = {}
     for e in g.table(SKILL_DIR, 'aura_skill_config_'):
         if e.name == 'AURA_CMD_INFO':
             skill_names.setdefault(_u(e.raw[0]), skill_text.get(_u(e.raw[2])))
+            if re.match(r'wk[sodk]', str(e.values[1])):  # keshin icons: aura_fs/k<number*10>
+                keshin_icons[_u(e.raw[0])] = f'file:k{e.raw[16] * 10:06d}_l'
     for e in g.table(SKILL_DIR, 'passive_skill_config_'):
         if e.name == 'PASSIVE_SKILL_INFO':
             nm = next((skill_text.get(_u(v)) for v in e.raw[1:6] if skill_text.get(_u(v))), None)
@@ -145,8 +151,12 @@ def build(g: GameData, lang='es') -> Catalog:
                 kind, array = 'Judías de entrenamiento', 'invEquipToken'
         if not name:
             continue
+        if c == 'SPECIAL_SKILL':
+            icon = keshin_icons.get(_u(e.raw[16]), '') if len(e.raw) > 16 else ''
+        else:
+            icon = f'item:{code}'
         cat.items[_u(e.raw[0])] = Item(_u(e.raw[0]), c, name, code, e.raw[7], array, kind,
-                                       (item_text.get(_u(e.raw[3])) or '') if c != 'SPECIAL_SKILL' else '')
+                                       (item_text.get(_u(e.raw[3])) or '') if c != 'SPECIAL_SKILL' else '', icon)
 
     base = {_u(e.raw[0]): e for e in g.table(CHARA_DIR, 'chara_base_') if e.name == 'CHARA_BASE_INFO'}
     seen = {}
@@ -160,7 +170,10 @@ def build(g: GameData, lang='es') -> Catalog:
         pid = _u(e.raw[0])
         cat.chara_names[pid] = name
         cat.chara_flag_index[pid] = b.raw[2]
-        if e.raw[12] == 1 and e.raw[9] in SPIRIT_KINDS:
+        has_face = f'data/dx11/menu/200_icon/10_icon_chr/face/{b.values[1]}_l.g4tx' in g.index
+        if has_face:
+            cat.chara_faces[pid] = f'face:{b.values[1]}'
+        if e.raw[12] == 1 and e.raw[9] in SPIRIT_KINDS and has_face:  # no face = test/minigame entry
             kind = SPIRIT_KINDS[e.raw[9]]
             key = (kind, _u(e.raw[1]))
             n = seen.get(key, 0)
@@ -171,7 +184,7 @@ def build(g: GameData, lang='es') -> Catalog:
                 continue
             desc = next((chara_desc[_u(v)] for v in b.raw if _u(v) in chara_desc), '')
             cat.spirits[pid] = Spirit(pid, name, kind, e.raw[9], n, ELEMENTS.get(e.raw[2], ''),
-                                      POSITIONS.get(e.raw[3], ''), desc.replace('\\n', ' '))
+                                      POSITIONS.get(e.raw[3], ''), desc.replace('\\n', ' '), cat.chara_faces[pid])
 
     team_text = g.texts('team_text', lang)
     teams = {_u(e.raw[0]): team_text[_u(e.raw[3])] for e in g.table('data/common/gamedata/team/', 'team_config_')

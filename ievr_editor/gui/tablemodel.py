@@ -20,6 +20,7 @@ class Column:
     bold: bool = False
     center: bool = False
     header_color: Optional[str] = None
+    icon: Optional[Callable[[Any], str]] = None          # IconLoader key shown next to the text
 
 
 class RowModel(QAbstractTableModel):
@@ -28,6 +29,7 @@ class RowModel(QAbstractTableModel):
         self.columns = columns
         self.rows = rows or []
         self.on_edit = on_edit
+        self.icons = None  # IconLoader
 
     def set_rows(self, rows):
         self.beginResetModel()
@@ -72,6 +74,8 @@ class RowModel(QAbstractTableModel):
             return v
         if role == Qt.UserRole:  # sort key
             return v
+        if role == Qt.DecorationRole and c.icon and self.icons:
+            return self.icons.pixmap(c.icon(row))
         if role == Qt.ToolTipRole and getattr(row, 'desc', ''):
             return row.desc
         if role == Qt.TextAlignmentRole:

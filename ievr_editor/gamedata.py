@@ -11,6 +11,7 @@ import zlib
 from pathlib import Path
 
 from . import config, cpk, rdbn, steam, t2b
+from .paths import cache_dir
 
 GAME_DIR_NAME = 'INAZUMA ELEVEN Victory Road'
 
@@ -54,7 +55,7 @@ class GameData:
             raise FileNotFoundError('INAZUMA ELEVEN Victory Road install not found')
         raw = (self.game_dir / 'data/cpk_list.cfg.bin').read_bytes()
         build = f'{zlib.crc32(raw):08x}'
-        self.cache = Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache')) / 'ievr-editor' / build
+        self.cache = cache_dir() / build
         self.index = self._load_index(raw)
         self._cpks = {}
 

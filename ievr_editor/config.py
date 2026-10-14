@@ -1,9 +1,9 @@
-"""Small persistent settings (~/.config/ievr-editor/config.json)."""
+"""Small persistent settings (config.json in the platform's config folder)."""
 import json
-import os
-from pathlib import Path
 
-PATH = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'ievr-editor' / 'config.json'
+from .paths import config_dir
+
+PATH = config_dir() / 'config.json'
 
 
 def _load():
