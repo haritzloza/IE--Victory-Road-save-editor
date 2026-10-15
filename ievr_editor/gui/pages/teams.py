@@ -85,7 +85,9 @@ class Pitch(QWidget):
                 font.setPointSizeF(8.5)
                 font.setBold(True)
                 p.setFont(font)
-                short = name if len(name) <= 13 else name[:12] + '…'
+                # long names collide on tight formations: show the surname, like a team sheet
+                short = name if len(name) <= 9 else name.split()[-1]
+                short = short if len(short) <= 11 else short[:10] + '…'
                 text = f'{number}  {short}'
                 tw = p.fontMetrics().horizontalAdvance(text) + 14
                 plate = QRectF(c.x() - tw / 2, c.y() + r + 3, tw, 18)
