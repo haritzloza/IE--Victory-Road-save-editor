@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 
 from .. import theme
 from ..tablemodel import Column
-from ..common import (SPIRIT_TIERS, KIND_LABEL, TablePage, OWNED_CHIPS)
+from ..common import (SPIRIT_TIERS, KIND_LABEL, TablePage, OWNED_CHIPS, undoable)
 
 
 class SpiritBulkDialog(QDialog):
@@ -80,6 +80,7 @@ class SpiritsPage(TablePage):
             return self.only_owned is None or st.spirit_owned(s) == self.only_owned
         self.proxy.set_predicate(pred)
 
+    @undoable(lambda self, tier, n, only_missing=False: ('Añadir espíritus que faltan' if only_missing else f'Espíritus: fijar {n} ({SPIRIT_TIERS[tier]})'))
     def bulk(self, tier, n, only_missing=False):
         st = self.win.state
         done = 0

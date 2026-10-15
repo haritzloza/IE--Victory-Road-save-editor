@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 from ...catalog import CHRONICLE_DIFFICULTY_NAMES
 from .. import theme
 from ..tablemodel import Column
-from ..common import (DIFFICULTY_SHORT, label, TablePage)
+from ..common import (DIFFICULTY_SHORT, label, TablePage, undoable)
 
 
 class ChroniclePage(TablePage):
@@ -61,6 +61,7 @@ class ChroniclePage(TablePage):
         self.sel_label.setText(f'· {n} seleccionados' if n else '· ninguno seleccionado')
         self.apply_btn.setEnabled(n > 0)
 
+    @undoable(lambda self, matches, k: f'Crónica: {len(matches)} partido(s) → {(["ninguna"] + CHRONICLE_DIFFICULTY_NAMES)[k]}')
     def set_level(self, matches, k):
         for m in matches:
             self.win.state.editor.set_chronicle(m.flag_index, k)

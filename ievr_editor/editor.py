@@ -3,7 +3,7 @@ import struct
 from dataclasses import dataclass
 from typing import Dict, List
 
-from . import l5bin
+from . import journal, l5bin
 from .savefile import SaveFile
 
 INVENTORY_SECTION = 0x04
@@ -40,6 +40,7 @@ def _int(v: l5bin.Value) -> int:
 
 
 def _set(v: l5bin.Value, n: int):
+    journal.touch(v.data)
     v.data[:] = n.to_bytes(len(v.data), 'little')
 
 
@@ -167,6 +168,7 @@ class Editor:
     def _write_spirit_stock(r: Row, count: int, tier: int):
         # one u16 per spirit tier (normal spirits have 6, hero/basara 1)
         d = r.f['stockNum'].data
+        journal.touch(d)
         struct.pack_into('<H', d, 2 * tier, min(count, 0xFFFF))
         if count and 'newFlag' in r:  # newFlag is a bit per tier ("new" badge)
             r['newFlag'] = r['newFlag'] | (1 << tier if len(d) > 2 else 1)
@@ -192,6 +194,8 @@ class Editor:
         unlocked = sum(1 << k for k in range(1, min(cleared_up_to + 1, difficulties) + 1))
         if cleared_up_to == 0:  # keep whether the first difficulty was reachable
             unlocked = ~lock[flag_index] & 0b10
+        for buf in (clear, lock, new):
+            journal.touch(buf)
         clear[flag_index] = (clear[flag_index] & ~mask) | c
         lock[flag_index] = (lock[flag_index] & ~mask) | (mask & ~unlocked)
         new[flag_index] &= ~mask
@@ -214,6 +218,7 @@ class Editor:
     def mark_characters_known(self, indices):
         """Set the database "met" bit (character known) for the given flag indices."""
         met = self._chara_flags('Met')
+        journal.touch(met)
         for i in indices:
             if i < len(met) * 8:
                 met[i >> 3] |= 1 << (i & 7)

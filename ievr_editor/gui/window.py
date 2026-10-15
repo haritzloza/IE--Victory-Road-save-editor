@@ -1,16 +1,18 @@
 """Main window: sidebar navigation, page stack, save/open."""
+from contextlib import nullcontext
 from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QMainWindow, QMessageBox, QProgressBar,
-    QPushButton, QStackedWidget, QVBoxLayout, QWidget,
+    QApplication, QButtonGroup, QDialog, QDialogButtonBox, QFileDialog, QFrame, QHBoxLayout, QListWidget,
+    QMainWindow, QMessageBox, QProgressBar, QPushButton, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from .. import config, paths
 from ..savefile import USERDATA_NAME, SaveFile, find_save_dirs
-from .common import (game_running, State, label, Toast)
+from . import theme
+from .common import State, Toast, game_running, label
 from .pages.items import ItemsPage
 from .pages.spirits import SpiritsPage
 from .pages.chronicle import ChroniclePage
@@ -63,6 +65,15 @@ class MainWindow(QMainWindow):
         box = QVBoxLayout()
         box.setContentsMargins(14, 0, 14, 0)
         box.setSpacing(8)
+        hist = QHBoxLayout()
+        hist.setSpacing(8)
+        self.undo_btn = QPushButton('↶  Deshacer')
+        self.redo_btn = QPushButton('↷  Rehacer')
+        for b, fn in ((self.undo_btn, self.undo), (self.redo_btn, self.redo)):
+            b.setCursor(Qt.PointingHandCursor)
+            b.clicked.connect(fn)
+            hist.addWidget(b)
+        box.addLayout(hist)
         self.save_btn = QPushButton('💾  Guardar cambios')
         self.save_btn.setObjectName('Primary')
         self.save_btn.setCursor(Qt.PointingHandCursor)
@@ -82,6 +93,9 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence.Save, self, self.do_save)
         QShortcut(QKeySequence.Open, self, self.open_dialog)
         QShortcut(QKeySequence.Find, self, self.focus_search)
+        QShortcut(QKeySequence.Undo, self, self.undo)
+        QShortcut(QKeySequence.Redo, self, self.redo)
+        QShortcut(QKeySequence('Ctrl+Y'), self, self.redo)
         for i in range(len(NAV)):
             QShortcut(QKeySequence(f'Ctrl+{i + 1}'), self, lambda i=i: self.go(i))
         self.update_title()
@@ -140,16 +154,47 @@ class MainWindow(QMainWindow):
         if path:
             self.open(path)
 
+    def action(self, label):
+        """Context manager grouping edits into one undo step."""
+        return self.state.journal.action(label) if self.state else nullcontext()
+
     def mark_dirty(self):
-        if self.state:
-            self.state.dirty = True
         self.update_title()
 
     def update_title(self):
         dirty = bool(self.state and self.state.dirty)
+        j = self.state.journal if self.state else None
         self.setWindowTitle(('● ' if dirty else '') + 'IEVR Save Editor')
         self.save_btn.setText('💾  Guardar cambios' + ('  ●' if dirty else ''))
         self.save_btn.setEnabled(dirty)
+        self.undo_btn.setEnabled(bool(j and j.undo))
+        self.redo_btn.setEnabled(bool(j and j.redo))
+        self.undo_btn.setToolTip(f'Deshacer: {j.undo[-1].label}' if j and j.undo else '')
+        self.redo_btn.setToolTip(f'Rehacer: {j.redo[-1].label}' if j and j.redo else '')
+
+    def _history(self, step, verb):
+        if not self.state:
+            return
+        # don't undo in the middle of an edit (open spin box / combo)
+        focus = QApplication.focusWidget()
+        if focus is not None and focus.inherits('QAbstractSpinBox'):
+            focus.clearFocus()
+        label = step()
+        if label is None:
+            return
+        self.state.reload_owned()
+        for i in range(self.stack.count()):
+            self.stack.widget(i).refresh()
+        self.update_title()
+        self.toast.show_message(f'{verb}: {label}', theme.ACCENT)
+
+    def undo(self):
+        if self.state:
+            self._history(self.state.journal.undo_last, 'Deshecho')
+
+    def redo(self):
+        if self.state:
+            self._history(self.state.journal.redo_last, 'Rehecho')
 
     def do_save(self):
         if not self.state or not self.state.dirty:
@@ -158,12 +203,14 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, 'Juego abierto', 'INAZUMA ELEVEN Victory Road está en ejecución.\n'
                                                        'Ciérralo antes de guardar, o sobrescribirá los cambios.')
             return
+        if not ChangesDialog(self, self.state.journal.pending()).exec():
+            return
         try:
             self.state.save.save()
         except Exception as e:
             QMessageBox.critical(self, 'Error', f'No se pudo guardar:\n{e}')
             return
-        self.state.dirty = False
+        self.state.journal.mark_saved()
         self.update_title()
         self.toast.show_message(f'✔  Guardado · copia del anterior en {paths.backup_dir()}')
 
@@ -175,6 +222,34 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, ev):
         ev.accept() if self.confirm_discard() else ev.ignore()
+
+
+class ChangesDialog(QDialog):
+    """List of the changes about to be written, with Save / Cancel."""
+
+    def __init__(self, parent, labels, limit=60):
+        super().__init__(parent)
+        self.setWindowTitle('Guardar cambios')
+        self.resize(560, 460)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(22, 20, 22, 20)
+        lay.setSpacing(10)
+        lay.addWidget(label(f'Se van a guardar {len(labels)} cambio(s)', 'PageTitle'))
+        lay.addWidget(label('Antes se hará una copia de seguridad de la partida actual.', 'PageSub'))
+        lst = QListWidget()
+        lst.setStyleSheet(f'QListWidget {{ background: {theme.SURFACE}; border: 1px solid {theme.BORDER};'
+                          f' border-radius: 10px; padding: 6px; }} QListWidget::item {{ padding: 4px; }}')
+        lst.addItems(labels[:limit])
+        if len(labels) > limit:
+            lst.addItem(f'… y {len(labels) - limit} más')
+        lay.addWidget(lst, 1)
+        bb = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        bb.button(QDialogButtonBox.Save).setObjectName('Primary')
+        bb.button(QDialogButtonBox.Save).setText('💾  Guardar')
+        bb.button(QDialogButtonBox.Cancel).setText('Cancelar')
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
 
 
 class Splash(QFrame):

@@ -1,4 +1,5 @@
 """Shared state, constants and base widgets of the GUI."""
+import functools
 import struct
 import subprocess
 import sys
@@ -12,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from .. import l5bin
 from ..editor import Editor
+from ..journal import Journal
 from ..savefile import SaveFile
 from . import theme
 from .tablemodel import FilterProxy, RowModel, SpinDelegate
@@ -54,8 +56,13 @@ class State:
         self.save = save
         self.editor = Editor(save)
         self.cat = cat
-        self.dirty = False
+        self.journal = Journal()
+        self.journal.activate()
         self.reload_owned()
+
+    @property
+    def dirty(self):
+        return self.journal.dirty
 
     def reload_owned(self):
         self.owned = self.editor.owned_items()
@@ -67,7 +74,6 @@ class State:
             return
         self.editor.set_item(item.array, item.id, n)
         self.owned[item.id] = n
-        self.dirty = True
 
     def spirit_count(self, sp, tier=0):
         st = self.spirits[sp.kind].get(sp.param_id)
@@ -82,7 +88,6 @@ class State:
         self.editor.set_spirit(sp.kind, sp.param_id, n, tier)
         st = self.spirits[sp.kind].setdefault(sp.param_id, [0] * 6 if sp.kind == 'normal' else [0])
         st[tier] = n
-        self.dirty = True
 
     def players(self):
         hp = l5bin.get(self.save.section(5).items, 'm_Permanent/m_saveHumanP')
@@ -105,6 +110,22 @@ class State:
         except (KeyError, IndexError, UnicodeDecodeError):
             pass
         return out
+
+
+def undoable(label):
+    """Run a page method as one undo step; ``label`` is a string or ``f(self, *args)``."""
+    def deco(fn):
+        @functools.wraps(fn)
+        def wrapper(self, *args, **kwargs):
+            win = self.win if hasattr(self, 'win') else self.page.win
+            try:
+                text = label(self, *args, **kwargs) if callable(label) else label
+            except Exception:  # a label must never block the edit
+                text = fn.__name__
+            with win.action(text):
+                return fn(self, *args, **kwargs)
+        return wrapper
+    return deco
 
 
 # ------------------------------------------------------------------------- widgets
@@ -193,6 +214,8 @@ class TablePage(Page):
     def __init__(self, title, subtitle, columns, on_edit):
         super().__init__(title, subtitle)
         self.model = RowModel(columns, on_edit=on_edit)
+        if getattr(self, 'win', None) is not None:
+            self.model.action = self.win.action
         self.proxy = FilterProxy()
         self.proxy.setSourceModel(self.model)
         self.view = QTableView()

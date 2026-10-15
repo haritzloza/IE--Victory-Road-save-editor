@@ -1,4 +1,5 @@
 """Generic editable table model + filter used by every tab."""
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional
 
@@ -30,6 +31,7 @@ class RowModel(QAbstractTableModel):
         self.rows = rows or []
         self.on_edit = on_edit
         self.icons = None  # IconLoader
+        self.action = None  # callable(label) -> context manager grouping an undo step
 
     def set_rows(self, rows):
         self.beginResetModel()
@@ -104,7 +106,9 @@ class RowModel(QAbstractTableModel):
             value = Qt.CheckState(value) == Qt.Checked
         elif role != Qt.EditRole:
             return False
-        c.set(row, value)
+        label = f'{self.columns[0].get(row)} · {c.title}: {"sí" if value is True else "no" if value is False else value}'
+        with self.action(label) if self.action else nullcontext():
+            c.set(row, value)
         self.dataChanged.emit(self.index(index.row(), 0), self.index(index.row(), len(self.columns) - 1))
         if self.on_edit:
             self.on_edit()

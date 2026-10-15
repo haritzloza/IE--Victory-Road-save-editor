@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 
 from .. import theme
 from ..tablemodel import Column
-from ..common import (TablePage, OWNED_CHIPS)
+from ..common import (TablePage, OWNED_CHIPS, undoable)
 
 
 class ItemsPage(TablePage):
@@ -64,6 +64,7 @@ class ItemsPage(TablePage):
             return self.only_owned is None or (st.owned.get(it.id, 0) > 0) == self.only_owned
         self.proxy.set_predicate(pred)
 
+    @undoable(lambda self, n, only_missing=False: ('Añadir los que faltan' if only_missing else 'Máximo' if n is None else f'Fijar cantidad {n}') + f' · {self.kind or ("técnicas" if self.skills else "objetos")}')
     def bulk(self, n, only_missing=False):
         done = 0
         try:

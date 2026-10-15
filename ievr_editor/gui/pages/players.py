@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from ...players import EQUIP_SLOTS, MAX_LEVEL, SKILL_SLOTS, Squad
 from .. import theme
 from ..tablemodel import Column
-from ..common import (AVATAR_ICON, PLAYER_RARITY, rarity_color, label, TablePage, SearchCombo, item_model)
+from ..common import (AVATAR_ICON, PLAYER_RARITY, rarity_color, label, TablePage, SearchCombo, item_model, undoable)
 
 
 class PlayerPanel(QFrame):
@@ -57,7 +57,8 @@ class PlayerPanel(QFrame):
         head.addLayout(names, 1)
         lay.addLayout(head)
         self.icon_labels = {}
-        page.win.icons.ready.connect(lambda _k: self.refresh_icons())
+        if page.win.icons is not None:
+            page.win.icons.ready.connect(lambda _k: self.refresh_icons())
 
         form = QFormLayout()
         form.setHorizontalSpacing(14)
@@ -120,6 +121,8 @@ class PlayerPanel(QFrame):
 
     def refresh_icons(self):
         icons = self.page.win.icons
+        if icons is None:
+            return
         cat = self.page.win.state.cat
         for field, (lbl, combo) in self.icon_labels.items():
             it = cat.items.get(combo.currentData() or 0)
@@ -153,22 +156,26 @@ class PlayerPanel(QFrame):
         self.loading = False
         self.refresh_icons()
 
+    @undoable(lambda self, v: f'Nivel de {self.page.player_name(self.player)} → {v}')
     def level_changed(self, v):
         if not self.loading and self.player:
             Squad.set_level(self.player, v)
             self.page.edited()
 
+    @undoable(lambda self, i: f'Rareza de {self.page.player_name(self.player)} → {self.rarity.currentText()}')
     def rarity_changed(self, i):
         if not self.loading and self.player:
             Squad.set_rarity(self.player, self.rarity.currentData())
             self.page.edited()
 
+    @undoable(lambda self, field, cb: f'{self.page.player_name(self.player)} · {field}: {cb.currentText()}')
     def equip_changed(self, field, cb):
         if self.player:
             self.page.squad.set_equipment(self.player, field, cb.currentData())
             self.page.edited(inventory=True)
             self.refresh_icons()
 
+    @undoable(lambda self, field, cb: f'{self.page.player_name(self.player)} · técnica: {cb.currentText()}')
     def tech_changed(self, field, cb):
         if self.player:
             self.page.squad.set_technique(self.player, field, cb.currentData())
@@ -235,12 +242,18 @@ class PlayersPage(TablePage):
             self.panel.title.setText(f'{len(sel)} jugadores seleccionados')
             self.panel.subtitle.setText('Usa los botones de abajo para editarlos a la vez')
 
+    def refresh(self):
+        self.model.refresh()
+        if self.panel.player is not None:
+            self.panel.show_player(self.panel.player)
+
     def edited(self, inventory=False):
         if inventory:
             self.win.state.reload_owned()
         self.win.mark_dirty()
         self.model.refresh()
 
+    @undoable(lambda self: f'Nivel 99 a {len(self.selected())} jugadores')
     def max_level(self):
         sel = self.selected()
         for p in sel:
@@ -248,6 +261,7 @@ class PlayersPage(TablePage):
         self.edited()
         self.win.toast.show_message(f'{len(sel)} jugadores a nivel 99')
 
+    @undoable(lambda self: f'Rareza de {len(self.selected())} jugadores')
     def ask_rarity(self):
         sel = self.selected()
         if not sel:

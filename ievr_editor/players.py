@@ -8,7 +8,7 @@ the avatar live in ``m_stEditP`` as one struct each with the same fields.
 import struct
 from typing import List, Optional, Tuple
 
-from . import l5bin
+from . import journal, l5bin
 from .editor import INVENTORY_HANDLE, Editor, Row, slot_handle
 
 PLAYER_SECTION = 0x05
@@ -65,6 +65,7 @@ class Player:
 
     def set(self, name, n: int):
         data, off, size = self._value(name)
+        journal.touch(data)
         data[off:off + size] = n.to_bytes(size, 'little')
 
     @property
@@ -172,6 +173,7 @@ class Squad:
         """Rename a created character everywhere its name is stored."""
         def put(v, s):
             b = s.encode()[:len(v.data) - 1]
+            journal.touch(v.data)
             v.data[:] = b + bytes(len(v.data) - len(b))
         targets = []
         for el in l5bin.find(self.root, 'm_stEditP').elements:

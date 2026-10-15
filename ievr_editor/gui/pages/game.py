@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...players import Squad
-from ..common import (label, Page)
+from ..common import (label, Page, undoable)
 
 
 class GamePage(Page):
@@ -74,12 +74,22 @@ class GamePage(Page):
         self.lay.addStretch()
 
     def refresh(self):
+        self.tokens.blockSignals(True)
+        self.tokens.setValue(self.win.state.editor.token_spirits())
+        self.tokens.blockSignals(False)
+        info = self.win.state.info()
+        if info.get('name'):
+            self.old_name = info['name']
+            self.name.setText(info['name'])
+            self.nick.setText(info.get('nick', ''))
+            self.win.update_player_label()
         idx = set(self.win.state.cat.chara_flag_index.values())
         known = self.win.state.editor.known_characters(idx)
         self.db_label.setText(f'{known} de {len(idx)} personajes conocidos')
         self.db_bar.setRange(0, len(idx))
         self.db_bar.setValue(known)
 
+    @undoable(lambda self: f'Renombrar avatar → {self.name.text().strip()}')
     def rename(self):
         name, nick = self.name.text().strip(), self.nick.text().strip()
         if not name or not self.old_name:
@@ -90,10 +100,12 @@ class GamePage(Page):
         self.win.update_player_label()
         self.win.toast.show_message(f'Avatar renombrado a {name}')
 
+    @undoable(lambda self, n: f'Espíritus ficha → {n}')
     def tokens_changed(self, n):
         self.win.state.editor.set_token_spirits(n)
         self.win.mark_dirty()
 
+    @undoable('Marcar todos los personajes como conocidos')
     def mark_known(self):
         self.win.state.editor.mark_characters_known(set(self.win.state.cat.chara_flag_index.values()))
         self.win.mark_dirty()
