@@ -1,15 +1,16 @@
 """Main window: sidebar navigation, page stack, save/open."""
+import threading
 from contextlib import nullcontext
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QButtonGroup, QDialog, QDialogButtonBox, QFileDialog, QFrame, QHBoxLayout, QListWidget,
     QMainWindow, QMessageBox, QProgressBar, QPushButton, QStackedWidget, QVBoxLayout, QWidget,
 )
 
-from .. import config, paths
+from .. import __version__, config, paths, updates
 from ..savefile import TESTED_APP_VERSION, TESTED_FORMAT_VERSION, USERDATA_NAME, SaveFile, find_save_dirs
 from . import theme
 from .common import State, Toast, game_running, label
@@ -29,6 +30,8 @@ NAV = [tr('🏠  Resumen'), tr('⚽  Jugadores'), tr('🎒  Objetos'), tr('🔥 
 
 
 class MainWindow(QMainWindow):
+    update_found = Signal(str, str)
+
     def __init__(self, cat, icons=None):
         super().__init__()
         self.cat = cat
@@ -48,7 +51,7 @@ class MainWindow(QMainWindow):
         sl.setContentsMargins(0, 0, 0, 16)
         sl.setSpacing(2)
         sl.addWidget(label('⚡ Victory Road', 'Brand'))
-        sl.addWidget(label('Save Editor', 'BrandSub'))
+        sl.addWidget(label(f'Save Editor  ·  v{__version__}', 'BrandSub'))
         self.nav = QButtonGroup(self)
         self.nav_buttons = []
         for i, text in enumerate(NAV):
@@ -60,6 +63,20 @@ class MainWindow(QMainWindow):
             self.nav_buttons.append(b)
             sl.addWidget(b)
         sl.addStretch()
+        self.update_box = QFrame()
+        self.update_box.setObjectName('Card')
+        self.update_box.setStyleSheet(f'#Card {{ margin: 0 14px 10px 14px; border-color: {theme.ACCENT}; }}')
+        ub = QVBoxLayout(self.update_box)
+        ub.setContentsMargins(12, 10, 12, 10)
+        self.update_label = label('', 'CardLabel')
+        self.update_label.setWordWrap(True)
+        self.update_btn = QPushButton(tr('Descargar'))
+        self.update_btn.setObjectName('Primary')
+        self.update_btn.setCursor(Qt.PointingHandCursor)
+        ub.addWidget(self.update_label)
+        ub.addWidget(self.update_btn)
+        self.update_box.hide()
+        sl.addWidget(self.update_box)
         self.player = label('', 'BrandSub')
         self.player.setWordWrap(True)
         sl.addWidget(self.player)
@@ -101,6 +118,22 @@ class MainWindow(QMainWindow):
         for i in range(len(NAV)):
             QShortcut(QKeySequence(f'Ctrl+{i + 1}'), self, lambda i=i: self.go(i))
         self.update_title()
+        self.update_found.connect(self.show_update)
+        if config.get('check_updates', True):
+            threading.Thread(target=self._check_updates, daemon=True).start()
+
+    def _check_updates(self):
+        try:
+            found = updates.latest_release()
+        except Exception:  # offline, rate limited… never bother the user
+            return
+        if found:
+            self.update_found.emit(*found)
+
+    def show_update(self, tag, url):
+        self.update_label.setText(tr('Hay una versión nueva del editor: {version}', version=tag))
+        self.update_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url)))
+        self.update_box.show()
 
     def go(self, i):
         if not self.state:
