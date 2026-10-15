@@ -62,7 +62,13 @@ class SummaryPage(Page):
         cat = st.cat
         info = st.info()
         t = info.get('time', 0)
-        self.cards['time'].set(f'{t // 3600} h {t % 3600 // 60:02} min', f"Guardado el {info.get('date', '?')}")
+        try:
+            (major, minor), fmt = st.save.versions()
+            ver = f'versión {major}.{minor}' + ('  ⚠️ más nueva que la probada' if st.save.newer_than_tested() else '')
+        except (KeyError, IndexError):
+            ver = ''
+        self.cards['time'].set(f'{t // 3600} h {t % 3600 // 60:02} min',
+                               f"Guardado el {info.get('date', '?')} · {ver}")
         self.cards['players'].set(len(st.players()), 'en tu plantilla')
 
         def ratio(key, pred):

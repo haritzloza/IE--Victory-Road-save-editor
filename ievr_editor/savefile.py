@@ -9,6 +9,9 @@ from . import container, l5bin, paths, steam
 APP_ID = 2799860
 USERDATA_NAME = '002AB8F4-USERDATALIVE'
 MAX_BACKUPS = 20
+# newest game / save-format versions the editor has been checked against
+TESTED_APP_VERSION = (7, 1)
+TESTED_FORMAT_VERSION = 90
 SYSTEM_NAME = '002AB8F4-SYSTEMLIVE'
 
 
@@ -43,6 +46,16 @@ class SaveFile:
             secs = l5bin.parse(e.data)
             self.order[e.name] = [s.section_id for s in secs]
             self.sections[e.name] = {s.section_id: s for s in secs}
+
+    def versions(self):
+        """(game version (major, minor), save format version) recorded in the save."""
+        p = l5bin.find(self.section(1).items, 'm_Permanent').items
+        g = lambda n: int.from_bytes(l5bin.find(p, n).data, 'little')
+        return (g('release_app_version'), g('minor_app_version')), g('minor_version')
+
+    def newer_than_tested(self) -> bool:
+        app, fmt = self.versions()
+        return app > TESTED_APP_VERSION or fmt > TESTED_FORMAT_VERSION
 
     def section(self, sid, entry='AUTOSAVE_data.bin') -> l5bin.Section:
         return self.sections[entry][sid]

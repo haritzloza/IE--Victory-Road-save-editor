@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import config, paths
-from ..savefile import USERDATA_NAME, SaveFile, find_save_dirs
+from ..savefile import TESTED_APP_VERSION, TESTED_FORMAT_VERSION, USERDATA_NAME, SaveFile, find_save_dirs
 from . import theme
 from .common import State, Toast, game_running, label
 from .pages.items import ItemsPage
@@ -135,6 +135,22 @@ class MainWindow(QMainWindow):
         self.update_player_label()
         self.update_title()
         self.go(0)
+        self.warn_version()
+
+    def warn_version(self):
+        try:
+            (major, minor), fmt = self.state.save.versions()
+            newer = self.state.save.newer_than_tested()
+        except (KeyError, IndexError):
+            return
+        if newer:
+            QMessageBox.warning(
+                self, 'Versión del juego más nueva',
+                f'Esta partida es de la versión {major}.{minor} del juego (formato {fmt}), más nueva que la '
+                f'última probada con el editor ({TESTED_APP_VERSION[0]}.{TESTED_APP_VERSION[1]}, formato '
+                f'{TESTED_FORMAT_VERSION}).\n\nPuede funcionar, pero si el juego ha cambiado el formato los cambios '
+                'podrían no aplicarse bien. Se hará una copia de seguridad al guardar; compruébalo en el juego '
+                'y busca si hay una versión nueva del editor.')
 
     def update_player_label(self):
         info = self.state.info()
