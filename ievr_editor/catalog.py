@@ -48,6 +48,12 @@ CHRONICLE_DIFFICULTY_NAMES = [
 ]
 
 ELEMENTS = {1: 'Viento', 2: 'Bosque', 3: 'Fuego', 4: 'Montaña'}
+SKILL_ELEMENTS = {**ELEMENTS, 5: 'Neutro'}
+# letter drawn on the badge of techniques that have no icon of their own
+KIND_BADGE = {'Supertécnica (tiro)': 'T', 'Supertécnica (regate)': 'R', 'Supertécnica (defensa)': 'D',
+              'Supertécnica (portero)': 'P', 'Supertécnica (especial)': 'E', 'Keshin': 'K',
+              'Armadura Keshin': 'A', 'Miximax': 'M', 'Tótem': 'Tt', 'Aura': 'Au', 'Modo': 'Mo',
+              'Transformación': 'Tr', 'Pasiva': 'Pa'}
 POSITIONS = {1: 'PR', 2: 'DL', 3: 'MC', 4: 'DF'}
 
 SPIRIT_KINDS = {0: 'normal', 1: 'normal', 2: 'normal', 3: 'normal', 4: 'hero', 5: 'basara'}
@@ -64,6 +70,9 @@ class Item:
     kind: str = ''         # finer kind for skills
     desc: str = ''
     icon: str = ''         # icons.IconStore key
+    element: str = ''      # techniques: Viento / Bosque / Fuego / Montaña / Neutro
+    power: int = 0         # techniques: power at max level
+    tp: int = 0            # techniques: TP cost
 
 
 @dataclass
@@ -119,8 +128,10 @@ def build(g: GameData, lang='es') -> Catalog:
 
     # skill / aura names by skill id
     skill_names = {}
+    skill_info = {}
     for r in g.table(SKILL_DIR, 'skill_config_')['m_skillInfoList']:
         skill_names[r['skillID']] = skill_text.get(r['skillNameId'])
+        skill_info[r['skillID']] = (SKILL_ELEMENTS.get(r['element'], ''), r['power_max'], r['consumeTp'])
     keshin_icons = {}
     for e in g.table(SKILL_DIR, 'aura_skill_config_'):
         if e.name == 'AURA_CMD_INFO':
@@ -152,12 +163,16 @@ def build(g: GameData, lang='es') -> Catalog:
                 kind, array = 'Judías de entrenamiento', 'invEquipToken'
         if not name:
             continue
+        element, power, tp = '', 0, 0
         if c == 'SPECIAL_SKILL':
-            icon = keshin_icons.get(_u(e.raw[16]), '') if len(e.raw) > 16 else ''
+            sid = _u(e.raw[16]) if len(e.raw) > 16 else 0
+            element, power, tp = skill_info.get(sid, ('', 0, 0))
+            icon = keshin_icons.get(sid) or f'badge:{element}:{KIND_BADGE.get(kind, "?")}'
         else:
             icon = f'item:{code}'
         cat.items[_u(e.raw[0])] = Item(_u(e.raw[0]), c, name, code, e.raw[7], array, kind,
-                                       (item_text.get(_u(e.raw[3])) or '') if c != 'SPECIAL_SKILL' else '', icon)
+                                       (item_text.get(_u(e.raw[3])) or '') if c != 'SPECIAL_SKILL' else '', icon,
+                                       element, power, tp)
 
     base = {_u(e.raw[0]): e for e in g.table(CHARA_DIR, 'chara_base_') if e.name == 'CHARA_BASE_INFO'}
     seen = {}

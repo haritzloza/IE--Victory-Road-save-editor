@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import theme
+from ..iconloader import BADGE_COLORS
 from ..tablemodel import Column
 from ..common import (TablePage, OWNED_CHIPS, undoable)
 
@@ -26,6 +27,11 @@ class ItemsPage(TablePage):
         if skills:
             cols.insert(2, Column('Obtenida', lambda it: st().owned.get(it.id, 0) > 0,
                                   lambda it, v: st().set_item(it, 1 if v else 0), check=True, center=True))
+            cols[2:2] = [
+                Column('Elemento', lambda it: it.element, fg=lambda it: BADGE_COLORS.get(it.element)),
+                Column('Potencia', lambda it: it.power or '', center=True, bold=True),
+                Column('TP', lambda it: it.tp or '', center=True, fg=lambda it: theme.TEXT_DIM),
+            ]
             title, sub = 'Técnicas', 'Supertécnicas, keshins, armaduras, miximax, tótems, pasivas y modos'
         else:
             title, sub = 'Objetos', 'Equipamiento, consumibles, tácticas y coleccionables · doble clic para editar'
@@ -35,6 +41,10 @@ class ItemsPage(TablePage):
         self.only_owned = None
         kinds = sorted({it.kind for it in win.state.cat.items.values() if (it.category == 'SPECIAL_SKILL') == skills})
         self.add_combo([('Todos los tipos', None)] + [(k, k) for k in kinds], self.set_kind)
+        self.element = None
+        if skills:
+            self.add_chips([('Todos', None)] + [(e, e) for e in ('Viento', 'Bosque', 'Fuego', 'Montaña', 'Neutro')],
+                           self.set_element)
         self.add_chips(OWNED_CHIPS, self.set_owned)
         if skills:
             self.add_button('Obtener todas las visibles', lambda: self.bulk(1, only_missing=True), primary=True)
@@ -51,6 +61,10 @@ class ItemsPage(TablePage):
         self.kind = k
         self.apply_filter()
 
+    def set_element(self, e):
+        self.element = e
+        self.apply_filter()
+
     def set_owned(self, o):
         self.only_owned = o
         self.apply_filter()
@@ -60,6 +74,8 @@ class ItemsPage(TablePage):
 
         def pred(it):
             if self.kind and it.kind != self.kind:
+                return False
+            if self.element and it.element != self.element:
                 return False
             return self.only_owned is None or (st.owned.get(it.id, 0) > 0) == self.only_owned
         self.proxy.set_predicate(pred)
