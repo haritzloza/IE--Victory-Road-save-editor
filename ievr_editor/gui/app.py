@@ -17,23 +17,22 @@ from ..savefile import USERDATA_NAME, describe_save_dir, find_save_dirs
 from . import theme
 from .iconloader import IconLoader
 from .window import MainWindow, Splash
+from ..i18n import tr
 
 
 def pick_game_dir():
     """Ask for the game folder until a valid one is chosen; remembered in the config."""
-    msg = ('No se ha encontrado INAZUMA ELEVEN Victory Road en tus bibliotecas de Steam.\n\n'
-           'Selecciona la carpeta del juego (la que contiene «nie.exe» y la carpeta «data»), normalmente:\n'
-           '…/steamapps/common/INAZUMA ELEVEN Victory Road')
-    QMessageBox.information(None, 'Juego no encontrado', msg)
+    msg = tr('GAME_NOT_FOUND')
+    QMessageBox.information(None, tr('Juego no encontrado'), msg)
     while True:
-        d = QFileDialog.getExistingDirectory(None, 'Carpeta de INAZUMA ELEVEN Victory Road', str(Path.home()))
+        d = QFileDialog.getExistingDirectory(None, tr('Carpeta de INAZUMA ELEVEN Victory Road'), str(Path.home()))
         if not d:
             return None
         if is_game_dir(d):
             config.set('game_dir', d)
             return d
-        QMessageBox.warning(None, 'Carpeta incorrecta',
-                            f'«{d}» no parece la carpeta del juego (falta data/cpk_list.cfg.bin).')
+        QMessageBox.warning(None, tr('Carpeta incorrecta'),
+                            tr('«{path}» no parece la carpeta del juego (falta data/cpk_list.cfg.bin).', path=d))
 
 
 def text_language(gd):
@@ -57,7 +56,7 @@ def choose_save(parent=None):
     labels = [describe_save_dir(d) for d in dirs]
     last = config.get('last_save_dir')
     current = next((i for i, d in enumerate(dirs) if str(d) == last), 0)
-    choice, ok = QInputDialog.getItem(parent, 'Elegir partida', 'Hay varias cuentas de Steam con partida:',
+    choice, ok = QInputDialog.getItem(parent, tr('Elegir partida'), tr('Hay varias cuentas de Steam con partida:'),
                                       labels, current, False)
     if not ok:
         return None
@@ -83,9 +82,8 @@ def main():
         cat = catalog_mod.build(gd, text_language(gd))
     except Exception as e:  # unexpected game data (new game version, broken install…)
         splash.close()
-        QMessageBox.critical(None, 'Error leyendo el juego',
-                             f'No se pudieron leer los datos del juego en:\n{game_dir}\n\n{type(e).__name__}: {e}\n\n'
-                             'Si el juego se ha actualizado hace poco, puede que el editor necesite una actualización.')
+        QMessageBox.critical(None, tr('Error leyendo el juego'),
+                             tr('GAME_READ_ERROR', path=game_dir, error=f'{type(e).__name__}: {e}'))
         return 1
     win = MainWindow(cat, IconLoader(IconStore(gd)))
     splash.close()

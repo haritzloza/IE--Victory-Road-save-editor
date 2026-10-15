@@ -20,11 +20,12 @@ from .pages.players import PlayersPage
 from .pages.game import GamePage
 from .pages.summary import SummaryPage
 from .pages.welcome import WelcomePage
+from ..i18n import tr
 
 
 # ------------------------------------------------------------------------- window
 
-NAV = ['🏠  Resumen', '⚽  Jugadores', '🎒  Objetos', '🔥  Técnicas', '✨  Espíritus', '📜  Crónica', '👤  Partida']
+NAV = [tr('🏠  Resumen'), tr('⚽  Jugadores'), tr('🎒  Objetos'), tr('🔥  Técnicas'), tr('✨  Espíritus'), tr('📜  Crónica'), tr('👤  Partida')]
 
 
 class MainWindow(QMainWindow):
@@ -67,19 +68,19 @@ class MainWindow(QMainWindow):
         box.setSpacing(8)
         hist = QHBoxLayout()
         hist.setSpacing(8)
-        self.undo_btn = QPushButton('↶ Deshacer')
-        self.redo_btn = QPushButton('↷ Rehacer')
+        self.undo_btn = QPushButton(tr('↶ Deshacer'))
+        self.redo_btn = QPushButton(tr('↷ Rehacer'))
         for b, fn in ((self.undo_btn, self.undo), (self.redo_btn, self.redo)):
             b.setStyleSheet('padding: 7px 2px;')
             b.setCursor(Qt.PointingHandCursor)
             b.clicked.connect(fn)
             hist.addWidget(b)
         box.addLayout(hist)
-        self.save_btn = QPushButton('💾  Guardar cambios')
+        self.save_btn = QPushButton(tr('💾  Guardar cambios'))
         self.save_btn.setObjectName('Primary')
         self.save_btn.setCursor(Qt.PointingHandCursor)
         self.save_btn.clicked.connect(self.do_save)
-        open_btn = QPushButton('📂  Abrir otra partida…')
+        open_btn = QPushButton(tr('📂  Abrir otra partida…'))
         open_btn.setCursor(Qt.PointingHandCursor)
         open_btn.clicked.connect(self.open_dialog)
         box.addWidget(self.save_btn)
@@ -118,7 +119,7 @@ class MainWindow(QMainWindow):
         try:
             save = SaveFile(path)
         except Exception as e:
-            QMessageBox.critical(self, 'Error', f'No se pudo abrir el guardado:\n{e}')
+            QMessageBox.critical(self, tr('Error'), tr('No se pudo abrir el guardado:\n{error}', error=e))
             return
         self.state = State(save, self.cat)
         config.set('last_save_dir', str(Path(path).resolve().parent))
@@ -145,12 +146,9 @@ class MainWindow(QMainWindow):
             return
         if newer:
             QMessageBox.warning(
-                self, 'Versión del juego más nueva',
-                f'Esta partida es de la versión {major}.{minor} del juego (formato {fmt}), más nueva que la '
-                f'última probada con el editor ({TESTED_APP_VERSION[0]}.{TESTED_APP_VERSION[1]}, formato '
-                f'{TESTED_FORMAT_VERSION}).\n\nPuede funcionar, pero si el juego ha cambiado el formato los cambios '
-                'podrían no aplicarse bien. Se hará una copia de seguridad al guardar; compruébalo en el juego '
-                'y busca si hay una versión nueva del editor.')
+                self, tr('Versión del juego más nueva'),
+                tr('VERSION_WARNING', major=major, minor=minor, fmt=fmt, tmajor=TESTED_APP_VERSION[0],
+                   tminor=TESTED_APP_VERSION[1], tfmt=TESTED_FORMAT_VERSION))
 
     def update_player_label(self):
         info = self.state.info()
@@ -167,7 +165,7 @@ class MainWindow(QMainWindow):
             return
         dirs = find_save_dirs()
         start = str(dirs[0]) if dirs else str(Path.home())
-        path, _ = QFileDialog.getOpenFileName(self, 'Abrir guardado', start, f'Guardado ({USERDATA_NAME});;Todos (*)')
+        path, _ = QFileDialog.getOpenFileName(self, tr('Abrir guardado'), start, tr('Guardado ({name});;Todos (*)', name=USERDATA_NAME))
         if path:
             self.open(path)
 
@@ -182,12 +180,12 @@ class MainWindow(QMainWindow):
         dirty = bool(self.state and self.state.dirty)
         j = self.state.journal if self.state else None
         self.setWindowTitle(('● ' if dirty else '') + 'IEVR Save Editor')
-        self.save_btn.setText('💾  Guardar cambios' + ('  ●' if dirty else ''))
+        self.save_btn.setText(tr('💾  Guardar cambios') + ('  ●' if dirty else ''))
         self.save_btn.setEnabled(dirty)
         self.undo_btn.setEnabled(bool(j and j.undo))
         self.redo_btn.setEnabled(bool(j and j.redo))
-        self.undo_btn.setToolTip(f'Deshacer: {j.undo[-1].label}' if j and j.undo else '')
-        self.redo_btn.setToolTip(f'Rehacer: {j.redo[-1].label}' if j and j.redo else '')
+        self.undo_btn.setToolTip(tr('Deshacer: {label}', label=j.undo[-1].label) if j and j.undo else '')
+        self.redo_btn.setToolTip(tr('Rehacer: {label}', label=j.redo[-1].label) if j and j.redo else '')
 
     def _history(self, step, verb):
         if not self.state:
@@ -203,38 +201,38 @@ class MainWindow(QMainWindow):
         for i in range(self.stack.count()):
             self.stack.widget(i).refresh()
         self.update_title()
-        self.toast.show_message(f'{verb}: {label}', theme.ACCENT)
+        self.toast.show_message(f'{tr(verb)}: {label}', theme.ACCENT)
 
     def undo(self):
         if self.state:
-            self._history(self.state.journal.undo_last, 'Deshecho')
+            self._history(self.state.journal.undo_last, tr('Deshecho'))
 
     def redo(self):
         if self.state:
-            self._history(self.state.journal.redo_last, 'Rehecho')
+            self._history(self.state.journal.redo_last, tr('Rehecho'))
 
     def do_save(self):
         if not self.state or not self.state.dirty:
             return
         if game_running():
-            QMessageBox.warning(self, 'Juego abierto', 'INAZUMA ELEVEN Victory Road está en ejecución.\n'
-                                                       'Ciérralo antes de guardar, o sobrescribirá los cambios.')
+            QMessageBox.warning(self, tr('Juego abierto'), tr('INAZUMA ELEVEN Victory Road está en ejecución.\n'
+                                                       'Ciérralo antes de guardar, o sobrescribirá los cambios.'))
             return
         if not ChangesDialog(self, self.state.journal.pending()).exec():
             return
         try:
             self.state.save.save()
         except Exception as e:
-            QMessageBox.critical(self, 'Error', f'No se pudo guardar:\n{e}')
+            QMessageBox.critical(self, tr('Error'), tr('No se pudo guardar:\n{error}', error=e))
             return
         self.state.journal.mark_saved()
         self.update_title()
-        self.toast.show_message(f'✔  Guardado · copia del anterior en {paths.backup_dir()}')
+        self.toast.show_message(tr('✔  Guardado · copia del anterior en {path}', path=paths.backup_dir()))
 
     def confirm_discard(self):
         if not self.state or not self.state.dirty:
             return True
-        return QMessageBox.question(self, 'Cambios sin guardar', '¿Descartar los cambios sin guardar?') \
+        return QMessageBox.question(self, tr('Cambios sin guardar'), tr('¿Descartar los cambios sin guardar?')) \
             == QMessageBox.Yes
 
     def closeEvent(self, ev):
@@ -246,24 +244,24 @@ class ChangesDialog(QDialog):
 
     def __init__(self, parent, labels, limit=60):
         super().__init__(parent)
-        self.setWindowTitle('Guardar cambios')
+        self.setWindowTitle(tr('Guardar cambios'))
         self.resize(560, 460)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(22, 20, 22, 20)
         lay.setSpacing(10)
-        lay.addWidget(label(f'Se van a guardar {len(labels)} cambio(s)', 'PageTitle'))
-        lay.addWidget(label('Antes se hará una copia de seguridad de la partida actual.', 'PageSub'))
+        lay.addWidget(label(tr('Se van a guardar {n} cambio(s)', n=len(labels)), 'PageTitle'))
+        lay.addWidget(label(tr('Antes se hará una copia de seguridad de la partida actual.'), 'PageSub'))
         lst = QListWidget()
         lst.setStyleSheet(f'QListWidget {{ background: {theme.SURFACE}; border: 1px solid {theme.BORDER};'
                           f' border-radius: 10px; padding: 6px; }} QListWidget::item {{ padding: 4px; }}')
         lst.addItems(labels[:limit])
         if len(labels) > limit:
-            lst.addItem(f'… y {len(labels) - limit} más')
+            lst.addItem(tr('… y {n} más', n=len(labels) - limit))
         lay.addWidget(lst, 1)
         bb = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         bb.button(QDialogButtonBox.Save).setObjectName('Primary')
-        bb.button(QDialogButtonBox.Save).setText('💾  Guardar')
-        bb.button(QDialogButtonBox.Cancel).setText('Cancelar')
+        bb.button(QDialogButtonBox.Save).setText(tr('💾  Guardar'))
+        bb.button(QDialogButtonBox.Cancel).setText(tr('Cancelar'))
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
         lay.addWidget(bb)
@@ -277,7 +275,7 @@ class Splash(QFrame):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(28, 24, 28, 24)
         lay.addWidget(label('⚡ Victory Road Save Editor', 'PageTitle'))
-        lay.addWidget(label('Leyendo los datos del juego…', 'PageSub'))
+        lay.addWidget(label(tr('Leyendo los datos del juego…'), 'PageSub'))
         bar = QProgressBar()
         bar.setRange(0, 0)
         bar.setTextVisible(False)

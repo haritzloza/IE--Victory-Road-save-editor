@@ -6,6 +6,7 @@ from typing import Any, Callable, List, Optional
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import QSpinBox, QStyledItemDelegate
+from ..i18n import tr
 
 
 @dataclass
@@ -106,7 +107,7 @@ class RowModel(QAbstractTableModel):
             value = Qt.CheckState(value) == Qt.Checked
         elif role != Qt.EditRole:
             return False
-        label = f'{self.columns[0].get(row)} · {c.title}: {"sí" if value is True else "no" if value is False else value}'
+        label = f'{self.columns[0].get(row)} · {c.title}: {tr("sí") if value is True else tr("no") if value is False else value}'
         with self.action(label) if self.action else nullcontext():
             c.set(row, value)
         self.dataChanged.emit(self.index(index.row(), 0), self.index(index.row(), len(self.columns) - 1))

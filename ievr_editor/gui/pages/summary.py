@@ -7,11 +7,12 @@ from PySide6.QtWidgets import (
 from ...catalog import CHRONICLE_DIFFICULTY_NAMES
 from .. import theme
 from ..common import (label, Page, Card)
+from ...i18n import tr
 
 
 class SummaryPage(Page):
     def __init__(self, win):
-        super().__init__('Resumen', 'Tu partida de un vistazo')
+        super().__init__(tr('Resumen'), tr('Tu partida de un vistazo'))
         self.win = win
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -22,11 +23,11 @@ class SummaryPage(Page):
         self.grid.setContentsMargins(0, 0, 0, 0)
         scroll.setWidget(inner)
         self.lay.addWidget(scroll, 1)
-        specs = [('time', 'Tiempo de juego', theme.ACCENT), ('players', 'Jugadores', theme.TEXT),
-                 ('items', 'Objetos y equipamiento', theme.TEXT), ('tech', 'Supertécnicas', theme.ACCENT),
-                 ('keshin', 'Keshins', '#a35cff'), ('armor', 'Armaduras keshin', '#3d8bff'),
-                 ('normal', 'Espíritus normales', theme.TIER_COLORS[0]), ('hero', 'Espíritus héroe', '#ff6fb5'),
-                 ('basara', 'Espíritus basara', '#ffb347')]
+        specs = [('time', tr('Tiempo de juego'), theme.ACCENT), ('players', tr('Jugadores'), theme.TEXT),
+                 ('items', tr('Objetos y equipamiento'), theme.TEXT), ('tech', tr('Supertécnicas'), theme.ACCENT),
+                 ('keshin', tr('Keshins'), '#a35cff'), ('armor', tr('Armaduras keshin'), '#3d8bff'),
+                 ('normal', tr('Espíritus normales'), theme.TIER_COLORS[0]), ('hero', tr('Espíritus héroe'), '#ff6fb5'),
+                 ('basara', tr('Espíritus basara'), '#ffb347')]
         self.cards = {}
         for i, (key, title, color) in enumerate(specs):
             c = Card(title, color)
@@ -37,13 +38,13 @@ class SummaryPage(Page):
         cl = QVBoxLayout(chron)
         cl.setContentsMargins(18, 16, 18, 16)
         cl.setSpacing(10)
-        cl.addWidget(label('Crónica · partidos superados por dificultad', 'CardLabel'))
+        cl.addWidget(label(tr('Crónica · partidos superados por dificultad'), 'CardLabel'))
         self.chron_rows = []
         g = QGridLayout()
         g.setHorizontalSpacing(16)
         g.setVerticalSpacing(10)
         for i, n in enumerate(CHRONICLE_DIFFICULTY_NAMES):
-            name, bar, num = QLabel(n), QProgressBar(), label('', 'CardLabel')
+            name, bar, num = QLabel(tr(n)), QProgressBar(), label('', 'CardLabel')
             name.setStyleSheet('background: transparent;')
             bar.setTextVisible(False)
             bar.setFixedHeight(8)
@@ -64,17 +65,17 @@ class SummaryPage(Page):
         t = info.get('time', 0)
         try:
             (major, minor), fmt = st.save.versions()
-            ver = f'versión {major}.{minor}' + ('  ⚠️ más nueva que la probada' if st.save.newer_than_tested() else '')
+            ver = tr('versión {major}.{minor}', major=major, minor=minor) + (tr('  ⚠️ más nueva que la probada') if st.save.newer_than_tested() else '')
         except (KeyError, IndexError):
             ver = ''
-        self.cards['time'].set(f'{t // 3600} h {t % 3600 // 60:02} min',
-                               f"Guardado el {info.get('date', '?')} · {ver}")
-        self.cards['players'].set(len(st.players()), 'en tu plantilla')
+        self.cards['time'].set(tr('{h} h {m:02} min', h=t // 3600, m=t % 3600 // 60),
+                               tr('Guardado el {date} · {version}', date=info.get('date', '?'), version=ver))
+        self.cards['players'].set(len(st.players()), tr('en tu plantilla'))
 
         def ratio(key, pred):
             items = [it for it in cat.items.values() if pred(it)]
             have = sum(1 for it in items if st.owned.get(it.id, 0))
-            self.cards[key].set(f'{have} / {len(items)}', f'{have * 100 // max(len(items), 1)} % del catálogo',
+            self.cards[key].set(f'{have} / {len(items)}', tr('{pct} % del catálogo', pct=have * 100 // max(len(items), 1)),
                                 have, len(items))
         ratio('items', lambda it: it.category != 'SPECIAL_SKILL')
         ratio('tech', lambda it: it.kind.startswith('Supertécnica'))
@@ -83,7 +84,7 @@ class SummaryPage(Page):
         for kind in ('normal', 'hero', 'basara'):
             total = [s for s in cat.spirits.values() if s.kind == kind]
             have = sum(1 for s in total if st.spirit_owned(s))
-            self.cards[kind].set(f'{have} / {len(total)}', f'{have * 100 // max(len(total), 1)} % del catálogo',
+            self.cards[kind].set(f'{have} / {len(total)}', tr('{pct} % del catálogo', pct=have * 100 // max(len(total), 1)),
                                  have, len(total))
         n = len(cat.chronicle)
         for k, (bar, num) in enumerate(self.chron_rows, 1):

@@ -95,6 +95,7 @@ QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
 QScrollBar::add-page, QScrollBar::sub-page {{ background: none; }}
 
 QSpinBox {{ background: {SURFACE_3}; border: 1px solid {ACCENT}; border-radius: 6px; padding: 2px 6px; }}
+QCheckBox {{ background: transparent; spacing: 8px; }}
 QCheckBox::indicator, QTableView::indicator {{
     width: 18px; height: 18px; border-radius: 5px; border: 2px solid {TEXT_DIM}; background: transparent;
 }}

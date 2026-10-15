@@ -17,15 +17,18 @@ from ..journal import Journal
 from ..savefile import SaveFile
 from . import theme
 from .tablemodel import FilterProxy, RowModel, SpinDelegate
+from ..i18n import tr
 
 
-SPIRIT_TIERS = ['Verde', 'Azul', 'Morado', 'Amarillo', 'Leyenda']
-DIFFICULTY_SHORT = ['Crónica', 'Desbloqueo', 'Obj. inusuales', 'Heroica', 'Heroica+', 'Legendaria']
-KIND_LABEL = {'normal': 'Normal', 'hero': 'Héroe', 'basara': 'Basara'}
+SPIRIT_TIERS = [tr('Verde'), tr('Azul'), tr('Morado'), tr('Amarillo'), tr('Leyenda')]
+DIFFICULTY_SHORT = [tr('Crónica'), tr('Desbloqueo'), tr('Obj. inusuales'), tr('Heroica'), tr('Heroica+'), tr('Legendaria')]
+KIND_LABEL = {'normal': tr('Normal'), 'hero': tr('Héroe'), 'basara': tr('Basara')}
+KIND_COLORS = {'normal': theme.KIND_COLORS['Normal'], 'hero': theme.KIND_COLORS['Héroe'],
+               'basara': theme.KIND_COLORS['Basara']}
 AVATAR_ICON = 'file:icon_ava_face00'  # generic avatar face from the avatar creator
 # charaRarity values; 0-4 follow the spirit colours, 5-7 are hero ("ídolo") cards
-PLAYER_RARITY = ['Verde', 'Azul', 'Morado', 'Amarillo', 'Leyenda', 'Ídolo rojo', 'Ídolo gris', 'Ídolo rosa',
-                 'Diamante']
+PLAYER_RARITY = [tr('Verde'), tr('Azul'), tr('Morado'), tr('Amarillo'), tr('Leyenda'), tr('Ídolo rojo'), tr('Ídolo gris'), tr('Ídolo rosa'),
+                 tr('Diamante')]
 RARITY_COLORS = theme.TIER_COLORS + ['#ff4d5e', '#b8bfcc', '#ff6fb5', '#7fe7ff']
 
 
@@ -240,7 +243,7 @@ class TablePage(Page):
         hh.setSectionResizeMode(QHeaderView.ResizeToContents)
         hh.setSectionResizeMode(0, QHeaderView.Stretch)
 
-        self.search = QLineEdit(placeholderText='🔍  Buscar por nombre…   (Ctrl+F)')
+        self.search = QLineEdit(placeholderText=tr('🔍  Buscar por nombre…   (Ctrl+F)'))
         self.search.setClearButtonEnabled(True)
         self._debounce = QTimer(self, singleShot=True, interval=120,
                                 timeout=lambda: self.proxy.set_text(self.search.text()))
@@ -261,7 +264,7 @@ class TablePage(Page):
         self.lay.addLayout(self.footer)
 
     def update_count(self, *a):
-        self.count.setText(f'{self.proxy.rowCount()} de {self.model.rowCount()}')
+        self.count.setText(tr('{shown} de {total}', shown=self.proxy.rowCount(), total=self.model.rowCount()))
 
     def add_button(self, text, fn, tip='', primary=False):
         b = QPushButton(text)
@@ -294,7 +297,7 @@ class TablePage(Page):
         self.model.refresh()
 
 
-OWNED_CHIPS = [('Todos', None), ('Tengo', True), ('No tengo', False)]
+OWNED_CHIPS = [(tr('Todos'), None), (tr('Tengo'), True), (tr('No tengo'), False)]
 
 
 class SearchCombo(QComboBox):
@@ -323,13 +326,13 @@ class SearchCombo(QComboBox):
 
 def item_model(items):
     m = QStandardItemModel()
-    empty = QStandardItem('— vacío —')
+    empty = QStandardItem(tr('— vacío —'))
     empty.setData(0, Qt.UserRole)
     m.appendRow(empty)
     for it in sorted(items, key=lambda it: it.name):
         si = QStandardItem(it.name)
         si.setData(it.id, Qt.UserRole)
-        si.setToolTip(it.kind)
+        si.setToolTip(tr(it.kind))
         m.appendRow(si)
     return m
 
