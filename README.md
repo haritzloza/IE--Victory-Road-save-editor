@@ -16,6 +16,7 @@ juego cerrado: no toca la memoria del juego ni el anticheat.
 | Sección | Qué se puede hacer |
 |---|---|
 | **Jugadores** | Nivel (hasta 99) y rareza de cada jugador y del avatar, también en bloque; **entrenamiento con judías** (los 3 huecos, hasta el límite de su nivel) ⚗️; equipamiento (botas, pulsera, accesorio, especial, ropa) y las 13 técnicas equipadas ⚗️ |
+| **Equipos** | Tus equipos guardados dibujados en un campo con su formación: intercambiar titulares y suplentes, sustituir por cualquier jugador de tu plantilla, nombrar capitán, cambiar la formación y editar a cada jugador (nivel, judías, equipamiento, técnicas) desde ahí mismo ⚗️ |
 | **Objetos** | Cantidades de todo el inventario y añadir lo que no tienes: consumibles, judías de entrenamiento, botas, pulseras, accesorios, equipaciones, ropa, emblemas, tácticas especiales, títulos… |
 | **Técnicas** | Supertécnicas (tiro, regate, defensa, portero) con elemento, potencia y TP, keshins, armaduras keshin, miximax, tótems, pasivas y modos |
 | **Espíritus** | Normales por rareza (verde, azul, morado, amarillo, leyenda), héroe y basara ⚗️ |
@@ -110,7 +111,8 @@ Tests: `python -m pytest tests` (usan datos sintéticos, no hacen falta partidas
 Save editor (Qt GUI, Linux and Windows, **English and Spanish interface**) for **INAZUMA ELEVEN: Victory
 Road** on Steam, with item icons and character faces. Undo/redo, a summary before saving and backups you
 can restore from the app. It edits the save file while the game is closed: players (level, rarity,
-equipment, equipped techniques, bean training), inventory, super techniques/keshins/miximax with power
+equipment, equipped techniques, bean training), saved teams on a pitch (line-up, captain, formation),
+inventory, super techniques/keshins/miximax with power
 and element, spirits, Chronicle mode progress, avatar name.
 Item and character names are read from your own game install, in your language.
 Unofficial, not affiliated with LEVEL-5, meant for offline play. GPL-3.0.

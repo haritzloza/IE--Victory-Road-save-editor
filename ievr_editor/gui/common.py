@@ -25,7 +25,7 @@ DIFFICULTY_SHORT = [tr('Crónica'), tr('Desbloqueo'), tr('Obj. inusuales'), tr('
 KIND_LABEL = {'normal': tr('Normal'), 'hero': tr('Héroe'), 'basara': tr('Basara')}
 KIND_COLORS = {'normal': theme.KIND_COLORS['Normal'], 'hero': theme.KIND_COLORS['Héroe'],
                'basara': theme.KIND_COLORS['Basara']}
-AVATAR_ICON = 'file:icon_ava_face00'  # generic avatar face from the avatar creator
+AVATAR_ICON = 'badge:avatar:★'  # drawn badge: the avatar has no face icon of its own
 # charaRarity values; 0-4 follow the spirit colours, 5-7 are hero ("ídolo") cards
 PLAYER_RARITY = [tr('Verde'), tr('Azul'), tr('Morado'), tr('Amarillo'), tr('Leyenda'), tr('Ídolo rojo'), tr('Ídolo gris'), tr('Ídolo rosa'),
                  tr('Diamante')]

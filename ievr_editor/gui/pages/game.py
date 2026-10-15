@@ -156,7 +156,7 @@ class GamePage(Page):
             return
         self.win.state.journal.mark_saved()  # the reopened save replaces any unsaved edits
         self.win.open(target)
-        self.win.go(6)
+        self.win.go(self.win.stack.count() - 1)  # this page is the last one
         self.win.toast.show_message(tr('✔  Copia restaurada'))
 
     @undoable(lambda self: tr('Renombrar avatar → {name}', name=self.name.text().strip()))

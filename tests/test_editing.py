@@ -266,3 +266,50 @@ def test_journal_undo_redo_restores_bytes(ed):
     j.undo_last()
     assert j.dirty
     journal._active = None
+
+
+# ---------------------------------------------------------------- teams
+
+def build_team(members):
+    """members: list of (handle, number, pos); filled up to 29 entries like the game."""
+    entries = []
+    for i in range(29):
+        h, n, pos = members[i] if i < len(members) else (0, i + 1, i)
+        entries.append([V('charaStHdl', struct.pack('<I', h)), V('uniformNo', struct.pack('<H', n)),
+                        V('scPosNo', bytes([pos])), V('titleFlag', bytes(4))])
+    from ievr_editor.teams import Team
+    items = [A('memberList', entries), V('formationId', struct.pack('<I', 0xF0)),
+             V('captainStHdl', struct.pack('<I', members[0][0])), V('teamName', b'Test'.ljust(128, b'\0')),
+             V('memberNum', bytes([len(members)]))]
+    return Team(items, 0, 0)
+
+
+def test_team_swap_put_captain_formation():
+    t = build_team([(0x10 + i, i + 1, i) for i in range(12)])  # 11 starters + 1 sub
+    assert t.name == 'Test' and t.at(0)['charaStHdl'] == 0x10
+    t.swap(0, 11)
+    assert t.at(0)['charaStHdl'] == 0x1B and t.at(11)['charaStHdl'] == 0x10
+    t.put(3, 0x99)  # outsider replaces the player at 3
+    assert t.at(3)['charaStHdl'] == 0x99 and 0x13 not in t.handles()
+    t.put(4, 0x99)  # already in the team: swaps places
+    assert t.at(4)['charaStHdl'] == 0x99 and t.at(3)['charaStHdl'] == 0x14
+    t.put(12, 0x77)  # empty bench spot: adds a member
+    assert t.at(12)['charaStHdl'] == 0x77 and t.row['memberNum'] == 13
+    t.set_captain(0x77)
+    assert t.captain == 0x77
+    t.set_captain(0x12345)  # not in the team: ignored
+    assert t.captain == 0x77
+    t.set_formation(0xABC)
+    assert t.formation_id == 0xABC
+
+
+def test_team_replacing_captain_moves_armband():
+    t = build_team([(0x10 + i, i + 1, i) for i in range(11)])
+    t.put(0, 0x55)
+    assert t.captain == 0x55
+
+
+def test_team_full():
+    t = build_team([(0x10 + i, i + 1, i) for i in range(20)])
+    with pytest.raises(ValueError):
+        t.put(20, 0x99)

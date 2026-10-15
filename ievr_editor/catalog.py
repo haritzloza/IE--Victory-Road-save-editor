@@ -99,10 +99,18 @@ class ChronicleMatch:
 
 
 @dataclass
+class Formation:
+    id: int
+    name: str
+    slots: List[tuple]     # 11 (or 5 for 5-a-side) x (x -1..1, y 0 attack..1 own goal, role 'PR'/'DF'/'MC'/'DL')
+
+
+@dataclass
 class Catalog:
     items: Dict[int, Item] = field(default_factory=dict)
     spirits: Dict[int, Spirit] = field(default_factory=dict)
     chronicle: List[ChronicleMatch] = field(default_factory=list)
+    formations: Dict[int, Formation] = field(default_factory=dict)
     chara_names: Dict[int, str] = field(default_factory=dict)   # param id -> name
     chara_flag_index: Dict[int, int] = field(default_factory=dict)  # param id -> database flag bit
     chara_faces: Dict[int, str] = field(default_factory=dict)  # param id -> face icon key
@@ -233,5 +241,27 @@ def build(g: GameData, lang='es') -> Catalog:
             title, nd = games[gid]
             order += 1
             cat.chronicle.append(ChronicleMatch(ri, order, p['statusFlagIndex'], gid, title, nd))
+    _formations(g, cat, item_text)
     return cat
+
+
+def _role(position_id):
+    return 'PR' if position_id <= 1 else 'DF' if position_id <= 4 else 'MC' if position_id <= 7 else 'DL'
+
+
+def _formations(g, cat, item_text):
+    import struct
+    t = g.table('data/common/gamedata/formation/', 'formation_config')
+    placements = t['m_SoccerFormPlacementInfoList']
+    # formation items (ITEM_FORMATION_INFO) name the formations that have no noun of their own
+    item_names = {_u(e.raw[16]): item_text.get(_u(e.raw[2])) for e in g.table(ITEM_DIR, 'item_config_')
+                  if e.name == 'ITEM_FORMATION_INFO' and len(e.raw) > 16}
+    for f in t['m_SoccerFormationInfoList']:
+        name = item_text.get(f['nounId']) or item_names.get(f['formId'])
+        start, count = f['placementInfo']
+        slots = sorted(placements[start:start + count], key=lambda p: p['positionNo'])
+        if not name or not slots:
+            continue
+        cat.formations[f['formId']] = Formation(
+            f['formId'], name, [(*struct.unpack('<2f', p['startPos']), _role(p['positionId'])) for p in slots])
 

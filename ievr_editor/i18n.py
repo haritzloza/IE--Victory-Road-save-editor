@@ -32,7 +32,7 @@ EN = {
     # ------------------------------------------------------------- navigation / window
     '🏠  Resumen': '🏠  Overview', '⚽  Jugadores': '⚽  Players', '🎒  Objetos': '🎒  Items',
     '🔥  Técnicas': '🔥  Techniques', '✨  Espíritus': '✨  Spirits', '📜  Crónica': '📜  Chronicle',
-    '👤  Partida': '👤  Save',
+    '👤  Partida': '👤  Save', '🏟  Equipos': '🏟  Teams',
     '↶ Deshacer': '↶ Undo', '↷ Rehacer': '↷ Redo',
     '💾  Guardar cambios': '💾  Save changes', '📂  Abrir otra partida…': '📂  Open another save…',
     'Deshacer: {label}': 'Undo: {label}', 'Rehacer: {label}': 'Redo: {label}',
@@ -135,6 +135,16 @@ EN = {
     '{n} jugadores entrenados al máximo': '{n} players fully trained',
     'Rareza de {n} jugadores': 'Rarity of {n} players', 'Rareza para {n} jugadores:': 'Rarity for {n} players:',
     '{n} jugadores → {value}': '{n} players → {value}',
+    # ------------------------------------------------------------- teams
+    'Equipos': 'Teams',
+    'Haz clic en un jugador para editarlo · «Intercambiar» y luego otro jugador para cambiarlos de sitio':
+        'Click a player to edit them · «Swap» and then another player to exchange their places',
+    'Formación': 'Formation', 'BANQUILLO': 'BENCH', '⇄  Intercambiar': '⇄  Swap', 'Ⓒ  Hacer capitán': 'Ⓒ  Make captain',
+    'Sustituir por': 'Replace with', 'Equipo {n}': 'Team {n}', 'variante {n}': 'variant {n}',
+    'sin formación': 'no formation', '{n} jugadores': '{n} players', '＋ hueco libre': '＋ free spot', 'Equipo': 'Team',
+    '{team}: intercambiar posiciones': '{team}: swap positions', '{team}: sustituir jugador': '{team}: replace player',
+    'El equipo está completo': 'The team is full', '{team}: nuevo capitán': '{team}: new captain',
+    '{team}: formación → {value}': '{team}: formation → {value}',
     # ------------------------------------------------------------- items / techniques
     'Técnicas': 'Techniques', 'Supertécnicas, keshins, armaduras, miximax, tótems, pasivas y modos':
         'Hissatsu, keshins, armours, miximax, totems, passives and modes',

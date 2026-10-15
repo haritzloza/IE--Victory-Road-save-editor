@@ -62,7 +62,7 @@ class IconLoader(QObject):
 
 
 BADGE_COLORS = {'Viento': '#3ecf8e', 'Bosque': '#7bc043', 'Fuego': '#ff6b4a', 'Montaña': '#c9a26b',
-                'Neutro': '#a35cff', '': '#5a6275'}
+                'Neutro': '#a35cff', 'avatar': '#ffc531', '': '#5a6275'}
 
 
 def badge(key, size):

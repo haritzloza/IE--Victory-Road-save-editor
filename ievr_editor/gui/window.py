@@ -18,6 +18,7 @@ from .pages.items import ItemsPage
 from .pages.spirits import SpiritsPage
 from .pages.chronicle import ChroniclePage
 from .pages.players import PlayersPage
+from .pages.teams import TeamsPage
 from .pages.game import GamePage
 from .pages.summary import SummaryPage
 from .pages.welcome import WelcomePage
@@ -26,7 +27,7 @@ from ..i18n import tr
 
 # ------------------------------------------------------------------------- window
 
-NAV = [tr('🏠  Resumen'), tr('⚽  Jugadores'), tr('🎒  Objetos'), tr('🔥  Técnicas'), tr('✨  Espíritus'), tr('📜  Crónica'), tr('👤  Partida')]
+NAV = [tr('🏠  Resumen'), tr('⚽  Jugadores'), tr('🏟  Equipos'), tr('🎒  Objetos'), tr('🔥  Técnicas'), tr('✨  Espíritus'), tr('📜  Crónica'), tr('👤  Partida')]
 
 
 class MainWindow(QMainWindow):
@@ -162,7 +163,8 @@ class MainWindow(QMainWindow):
             w = self.stack.widget(0)
             self.stack.removeWidget(w)
             w.deleteLater()
-        for page in (SummaryPage(self), PlayersPage(self), ItemsPage(self), ItemsPage(self, skills=True),
+        self.players_page = PlayersPage(self)
+        for page in (SummaryPage(self), self.players_page, TeamsPage(self), ItemsPage(self), ItemsPage(self, skills=True),
                      SpiritsPage(self), ChroniclePage(self), GamePage(self)):
             self.stack.addWidget(page)
         self.path = path
