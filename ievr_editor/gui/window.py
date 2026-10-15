@@ -70,6 +70,7 @@ class MainWindow(QMainWindow):
         self.undo_btn = QPushButton('↶  Deshacer')
         self.redo_btn = QPushButton('↷  Rehacer')
         for b, fn in ((self.undo_btn, self.undo), (self.redo_btn, self.redo)):
+            b.setStyleSheet('padding: 7px 4px;')
             b.setCursor(Qt.PointingHandCursor)
             b.clicked.connect(fn)
             hist.addWidget(b)

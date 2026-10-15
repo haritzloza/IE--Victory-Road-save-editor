@@ -1,19 +1,23 @@
-"""Game page."""
+"""Game page: avatar, token spirits, character database and backups."""
+from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton,
-    QSpinBox, QVBoxLayout,
+    QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
+    QProgressBar, QPushButton, QSpinBox, QVBoxLayout,
 )
 
+from ... import paths
 from ...players import Squad
-from ..common import (label, Page, undoable)
+from ...savefile import list_backups, restore_backup
+from ..common import Page, game_running, label, undoable
 
 
 class GamePage(Page):
     """Avatar name, token spirits and character database."""
 
     def __init__(self, win):
-        super().__init__('Partida', 'Avatar, fichas y base de datos de personajes')
+        super().__init__('Partida', 'Avatar, fichas, base de datos de personajes y copias de seguridad')
         self.win = win
         self.squad = Squad(win.state.editor)
         st = win.state
@@ -65,13 +69,28 @@ class GamePage(Page):
         b2.clicked.connect(self.mark_known)
         v.addWidget(b2)
 
+        backups = QFrame()
+        backups.setObjectName('Card')
+        bv = QVBoxLayout(backups)
+        bv.setContentsMargins(20, 18, 20, 18)
+        bv.addWidget(label('COPIAS DE SEGURIDAD', 'CardLabel'))
+        bv.addWidget(label(f'Se crean al guardar y al restaurar, en {paths.backup_dir()}', 'CardLabel'))
+        self.backup_list = QListWidget()
+        self.backup_list.setStyleSheet('QListWidget { background: transparent; border: none; } '
+                                       'QListWidget::item { padding: 6px; border-radius: 6px; }')
+        self.backup_list.setMinimumHeight(150)
+        bv.addWidget(self.backup_list, 1)
+        b3 = QPushButton('↺  Restaurar la copia seleccionada')
+        b3.clicked.connect(self.restore)
+        bv.addWidget(b3, 0, Qt.AlignLeft)
+
         row = QHBoxLayout()
         row.setSpacing(14)
         row.addWidget(avatar, 1)
         row.addWidget(tokens, 1)
         self.lay.addLayout(row)
         self.lay.addWidget(db)
-        self.lay.addStretch()
+        self.lay.addWidget(backups, 1)
 
     def refresh(self):
         self.tokens.blockSignals(True)
@@ -83,11 +102,43 @@ class GamePage(Page):
             self.name.setText(info['name'])
             self.nick.setText(info.get('nick', ''))
             self.win.update_player_label()
+        self.backup_list.clear()
+        for path, when, size in list_backups(self.win.state.save.path.name):
+            it = QListWidgetItem(f'🗂  {when}   ·   {size / 1048576:.1f} MB')
+            it.setData(Qt.UserRole, str(path))
+            self.backup_list.addItem(it)
+        if not self.backup_list.count():
+            self.backup_list.addItem('Todavía no hay copias: se crea una cada vez que guardas.')
         idx = set(self.win.state.cat.chara_flag_index.values())
         known = self.win.state.editor.known_characters(idx)
         self.db_label.setText(f'{known} de {len(idx)} personajes conocidos')
         self.db_bar.setRange(0, len(idx))
         self.db_bar.setValue(known)
+
+    def restore(self):
+        it = self.backup_list.currentItem()
+        path = it.data(Qt.UserRole) if it else None
+        if not path:
+            return
+        if game_running():
+            QMessageBox.warning(self, 'Juego abierto', 'Cierra INAZUMA ELEVEN Victory Road antes de restaurar.')
+            return
+        msg = (f'¿Restaurar la partida del {it.text().split("·")[0][3:].strip()}?\n\n'
+               'La partida actual se guardará antes como copia de seguridad.')
+        if self.win.state.dirty:
+            msg += '\nLos cambios sin guardar del editor se perderán.'
+        if QMessageBox.question(self, 'Restaurar copia', msg) != QMessageBox.Yes:
+            return
+        target = self.win.state.save.path
+        try:
+            restore_backup(Path(path), target)
+        except Exception as e:
+            QMessageBox.critical(self, 'Error', f'No se pudo restaurar la copia:\n{e}')
+            return
+        self.win.state.journal.mark_saved()  # the reopened save replaces any unsaved edits
+        self.win.open(target)
+        self.win.go(6)
+        self.win.toast.show_message('✔  Copia restaurada')
 
     @undoable(lambda self: f'Renombrar avatar → {self.name.text().strip()}')
     def rename(self):

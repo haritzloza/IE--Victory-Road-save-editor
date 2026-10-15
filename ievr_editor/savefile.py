@@ -57,17 +57,52 @@ class SaveFile:
         return self.container.dump()
 
     def save(self, path=None, backup_dir=None):
-        """Write the save; the previous file is copied to ``backup_dir`` first."""
+        """Write the save; the previous file is copied to the backups folder first."""
         target = Path(path) if path else self.path
         data = self.to_bytes()
         container.Container.load(data)  # sanity check before touching the disk
-        if target.exists():
-            # keep backups out of the Steam Cloud folder
-            bdir = Path(backup_dir) if backup_dir else paths.backup_dir()
-            bdir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(target, bdir / f'{target.name}.{time.strftime("%Y%m%d-%H%M%S")}')
-            for old in sorted(bdir.glob(f'{target.name}.*'))[:-MAX_BACKUPS]:
-                old.unlink()
-        tmp = target.with_suffix('.tmp')
-        tmp.write_bytes(data)
-        tmp.replace(target)
+        write_with_backup(target, data, backup_dir)
+
+
+def make_backup(target: Path, backup_dir=None):
+    """Copy ``target`` to the backups folder (outside Steam Cloud), keeping the newest MAX_BACKUPS."""
+    if not target.exists():
+        return
+    bdir = Path(backup_dir) if backup_dir else paths.backup_dir()
+    bdir.mkdir(parents=True, exist_ok=True)
+    dest = bdir / f'{target.name}.{time.strftime("%Y%m%d-%H%M%S")}'
+    n = 1
+    while dest.exists():  # two backups within the same second
+        dest = dest.with_name(f'{dest.name.split("-v")[0]}-v{n}')
+        n += 1
+    shutil.copy2(target, dest)
+    for old in sorted(bdir.glob(f'{target.name}.*'))[:-MAX_BACKUPS]:
+        old.unlink()
+
+
+def write_with_backup(target: Path, data: bytes, backup_dir=None):
+    make_backup(target, backup_dir)
+    tmp = target.with_suffix('.tmp')
+    tmp.write_bytes(data)
+    tmp.replace(target)
+
+
+def list_backups(name=USERDATA_NAME, backup_dir=None):
+    """[(path, datetime text, size)] newest first."""
+    bdir = Path(backup_dir) if backup_dir else paths.backup_dir()
+    out = []
+    for p in sorted(bdir.glob(f'{name}.*'), reverse=True):
+        stamp = p.name[len(name) + 1:][:15]
+        try:
+            when = time.strftime('%d/%m/%Y %H:%M:%S', time.strptime(stamp, '%Y%m%d-%H%M%S'))
+        except ValueError:
+            continue
+        out.append((p, when, p.stat().st_size))
+    return out
+
+
+def restore_backup(backup: Path, target: Path, backup_dir=None):
+    """Put a backup back in place (the current save is backed up first)."""
+    data = Path(backup).read_bytes()  # read before rotating: it may be the oldest backup
+    container.Container.load(data)     # refuse anything that isn't a valid save
+    write_with_backup(Path(target), data, backup_dir)
