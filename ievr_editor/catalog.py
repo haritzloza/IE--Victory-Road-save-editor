@@ -2,7 +2,7 @@
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from .gamedata import GameData
 
@@ -46,6 +46,10 @@ CHRONICLE_DIFFICULTY_NAMES = [
     'Batalla de crónica', 'Batalla de desbloqueo de ruta', 'Batalla de objetos inusuales',
     'Batalla heroica', 'Batalla heroica+', 'Batalla legendaria',
 ]
+# Only the first two difficulties advance along the board: a first win opens
+# them on the squares listed in the piece's unlockPieceInfo; the rest are
+# unlocked per match by beating the previous difficulty.
+CHRONICLE_ROUTE_BITS = 0b110
 
 ELEMENTS = {1: 'Viento', 2: 'Bosque', 3: 'Fuego', 4: 'Montaña'}
 SKILL_ELEMENTS = {**ELEMENTS, 5: 'Neutro'}
@@ -110,6 +114,8 @@ class Catalog:
     items: Dict[int, Item] = field(default_factory=dict)
     spirits: Dict[int, Spirit] = field(default_factory=dict)
     chronicle: List[ChronicleMatch] = field(default_factory=list)
+    # every board square: status flag index -> (is a match, flag indices it unlocks)
+    chronicle_board: Dict[int, Tuple[bool, List[int]]] = field(default_factory=dict)
     formations: Dict[int, Formation] = field(default_factory=dict)
     chara_names: Dict[int, str] = field(default_factory=dict)   # param id -> name
     chara_flag_index: Dict[int, int] = field(default_factory=dict)  # param id -> database flag bit
@@ -228,6 +234,12 @@ def build(g: GameData, lang='es') -> Catalog:
     route = g.table('data/common/gamedata/vsroute/', 'chronicle_vs_route_config_')
     events = route['m_pieceEventInfoList']
     pieces = route['m_pieceInfoList']
+    unlocks = route['m_unlockPieceInfoList']
+    flag_of = {p['pieceId']: p['statusFlagIndex'] for p in pieces}
+    for p in pieces:
+        a, n = p['unlockPieceInfo']
+        cat.chronicle_board[p['statusFlagIndex']] = (
+            p['eventType'] == 0, [flag_of[u['unlockPieceId']] for u in unlocks[a:a + n] if u['unlockPieceId'] in flag_of])
     for ri, r in enumerate(route['m_chronicleVsRouteInfoList']):
         start, count = r['pieceInfo']
         order = 0
@@ -239,6 +251,7 @@ def build(g: GameData, lang='es') -> Catalog:
             if gid is None:
                 continue
             title, nd = games[gid]
+            title = re.sub(r'<\w+:([^>]+)>', lambda t: t.group(1).title(), title)  # name placeholders
             order += 1
             cat.chronicle.append(ChronicleMatch(ri, order, p['statusFlagIndex'], gid, title, nd))
     _formations(g, cat, item_text)

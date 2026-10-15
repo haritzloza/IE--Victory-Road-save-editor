@@ -66,6 +66,7 @@ class ChroniclePage(TablePage):
     def set_level(self, matches, k):
         for m in matches:
             self.win.state.editor.set_chronicle(m.flag_index, k)
+        self.win.state.editor.open_chronicle_routes(self.win.state.cat.chronicle_board)
         self.win.mark_dirty()
         self.model.refresh()
 

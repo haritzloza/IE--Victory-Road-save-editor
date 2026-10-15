@@ -204,6 +204,30 @@ class Editor:
         lock[flag_index] = (lock[flag_index] & ~mask) | (mask & ~unlocked)
         new[flag_index] &= ~mask
 
+    def open_chronicle_routes(self, board) -> int:
+        """Unlock the squares that follow beaten matches, as the game does on a first win.
+
+        ``board`` is ``Catalog.chronicle_board``. Matches pass on the route
+        difficulties they have cleared, other squares (paths, route starts) the
+        ones they have open. Only ever unlocks; returns how many squares changed.
+        """
+        from .catalog import CHRONICLE_ROUTE_BITS
+        clear, lock, new = self._chronicle_flags()
+        journal.touch(lock)
+        journal.touch(new)
+        changed, todo = set(), list(board)
+        while todo:
+            f = todo.pop()
+            is_match, targets = board[f]
+            opened = (clear[f] if is_match else ~lock[f]) & CHRONICLE_ROUTE_BITS
+            for t in targets:
+                if t < len(lock) and lock[t] & opened:
+                    new[t] |= lock[t] & opened
+                    lock[t] &= ~opened
+                    changed.add(t)
+                    todo.append(t)
+        return len(changed)
+
     # ---------------------------------------------------------------- misc
     def token_spirits(self) -> int:
         """Stock of the "ficha" spirit (tokenSpiritInfo)."""

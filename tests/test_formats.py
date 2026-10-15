@@ -154,3 +154,20 @@ def test_chronicle_bits(k, clear, lock):
     assert e.flags[0][1] == clear
     assert e.flags[1][1] == lock
     assert e.flags[0][0] == 0 and e.flags[1][0] == 0x7E  # other pieces untouched
+
+
+def test_chronicle_routes_open_following_squares():
+    # 0 match -> 1 path square -> 2 match ; 2 -> 3 route start (non-match) -> 4 match ; 5 unrelated
+    board = {0: (True, [1, 2]), 1: (False, []), 2: (True, [3]), 3: (False, [4]), 4: (True, []), 5: (True, [])}
+    e = FakeEditor()
+    e.flags = (bytearray(6), bytearray(b'\x7e' * 6), bytearray(6))
+    e.set_chronicle(0, 6)
+    assert e.open_chronicle_routes(board) == 2
+    clear, lock, new = e.flags
+    assert lock[1] == lock[2] == 0x78 and new[2] == 0x06   # only crónica + desbloqueo de ruta propagate
+    assert lock[3] == lock[4] == lock[5] == 0x7E           # 2 not beaten yet
+    e.set_chronicle(2, 1)
+    assert e.open_chronicle_routes(board) == 2
+    assert lock[2] == 0x78                                  # own next difficulty (2) stays open
+    assert lock[3] == 0x7C and lock[4] == 0x7C              # cascades through the non-match square
+    assert e.open_chronicle_routes(board) == 0              # idempotent, never relocks
