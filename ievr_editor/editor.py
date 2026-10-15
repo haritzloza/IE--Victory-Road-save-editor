@@ -99,7 +99,11 @@ class Editor:
         """item_id -> total count over all inventory arrays."""
         out = {}
         for name in INVENTORY_HANDLE:
-            for e in self.inventory(name):
+            try:
+                entries = self.inventory(name)
+            except KeyError:  # array not present in this save version
+                continue
+            for e in entries:
                 out[e.item_id] = out.get(e.item_id, 0) + e.count
         return out
 
