@@ -15,20 +15,24 @@ juego cerrado: no toca la memoria del juego ni el anticheat.
 
 | Sección | Qué se puede hacer |
 |---|---|
-| **Jugadores** | Nivel (hasta 99) y rareza de cada jugador y del avatar, también en bloque; equipamiento (botas, pulsera, accesorio, especial, ropa) y las 13 técnicas equipadas ⚗️ |
+| **Jugadores** | Nivel (hasta 99) y rareza de cada jugador y del avatar, también en bloque; **entrenamiento con judías** (los 3 huecos, hasta el límite de su nivel) ⚗️; equipamiento (botas, pulsera, accesorio, especial, ropa) y las 13 técnicas equipadas ⚗️ |
 | **Objetos** | Cantidades de todo el inventario y añadir lo que no tienes: consumibles, judías de entrenamiento, botas, pulseras, accesorios, equipaciones, ropa, emblemas, tácticas especiales, títulos… |
-| **Técnicas** | Supertécnicas (tiro, regate, defensa, portero), keshins, armaduras keshin, miximax, tótems, pasivas y modos |
+| **Técnicas** | Supertécnicas (tiro, regate, defensa, portero) con elemento, potencia y TP, keshins, armaduras keshin, miximax, tótems, pasivas y modos |
 | **Espíritus** | Normales por rareza (verde, azul, morado, amarillo, leyenda), héroe y basara ⚗️ |
 | **Crónica** | Marcar partidos como superados hasta cualquiera de las 6 dificultades, uno a uno o en bloque |
-| **Partida** | Nombre y apodo del avatar ⚗️, espíritus ficha, marcar personajes como conocidos en la base de datos ⚗️ |
+| **Partida** | Nombre y apodo del avatar ⚗️, espíritus ficha, marcar personajes como conocidos en la base de datos ⚗️, restaurar copias de seguridad, idioma |
+
+Además: **Deshacer/Rehacer** (`Ctrl+Z` / `Ctrl+Y`), **resumen de los cambios** antes de guardar, aviso si
+la partida es de una versión del juego más nueva que la probada y aviso de nuevas versiones del editor
+(se puede desactivar). Interfaz en **español e inglés** (según el idioma del sistema).
 
 ⚗️ = experimental: funciona sobre el formato, pero aún no se ha comprobado a fondo en el juego.
 
 Las tablas muestran el **icono de cada objeto** (equipamiento, consumibles, equipaciones, ropa,
 emblemas, keshins…) y la **cara de cada jugador y espíritu**, sacados de tu instalación del juego.
 
-Los nombres de objetos, personajes y técnicas se leen **de tu propia instalación del juego**
-(en español); el editor no incluye ningún archivo del juego.
+Los nombres de objetos, personajes y técnicas se leen **de tu propia instalación del juego**,
+en tu idioma; el editor no incluye ningún archivo del juego.
 
 ## Instalación
 
@@ -59,7 +63,8 @@ En Linux, `./build.sh` y `./install.sh` lo compilan y lo añaden al menú de apl
    - Encuentra el juego en cualquiera de tus bibliotecas de Steam. Si no lo encuentra, te pide
      la carpeta una vez y la recuerda.
    - Los nombres de objetos y personajes salen en el idioma de tu sistema si el juego lo
-     tiene (español, inglés, francés, alemán, italiano, portugués…); la interfaz está en español.
+     tiene (español, inglés, francés, alemán, italiano, portugués…). La interfaz está en español
+     o inglés; se puede cambiar en la página Partida.
 3. Edita y pulsa **Guardar** (`Ctrl+S`). La partida anterior se copia en la carpeta de copias
    (se guardan las 20 últimas):
    - Linux: `~/.local/share/ievr-editor/backups/`
@@ -102,9 +107,10 @@ Tests: `python -m pytest tests` (usan datos sintéticos, no hacen falta partidas
 
 ## English summary
 
-Save editor (Qt GUI, Linux and Windows) for **INAZUMA ELEVEN: Victory Road** on Steam, with item
-icons and character faces. It edits the save
-file while the game is closed: players (level, rarity, equipment, equipped techniques),
-inventory, super techniques/keshins/miximax, spirits, Chronicle mode progress, avatar name.
-Item and character names are read from your own game install. The UI is in Spanish.
+Save editor (Qt GUI, Linux and Windows, **English and Spanish interface**) for **INAZUMA ELEVEN: Victory
+Road** on Steam, with item icons and character faces. Undo/redo, a summary before saving and backups you
+can restore from the app. It edits the save file while the game is closed: players (level, rarity,
+equipment, equipped techniques, bean training), inventory, super techniques/keshins/miximax with power
+and element, spirits, Chronicle mode progress, avatar name.
+Item and character names are read from your own game install, in your language.
 Unofficial, not affiliated with LEVEL-5, meant for offline play. GPL-3.0.
