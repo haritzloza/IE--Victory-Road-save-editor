@@ -4,10 +4,11 @@ import re
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QFormLayout, QFrame, QHBoxLayout, QHeaderView, QInputDialog,
-    QLabel, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
+    QLabel, QPushButton, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
 )
 
-from ...players import EQUIP_SLOTS, MAX_LEVEL, SKILL_SLOTS, Squad
+from ...players import (EQUIP_SLOTS, MAX_LEVEL, SKILL_SLOTS, Squad, max_training, set_training, training,
+                         training_cap)
 from .. import theme
 from ..tablemodel import Column
 from ..common import (AVATAR_ICON, PLAYER_RARITY, rarity_color, label, TablePage, SearchCombo, item_model, undoable)
@@ -74,6 +75,27 @@ class PlayerPanel(QFrame):
         lay.addLayout(form)
 
         lay.addSpacing(8)
+        head = QHBoxLayout()
+        head.addWidget(label('ENTRENAMIENTO (JUDÍAS)', 'CardLabel'))
+        head.addStretch()
+        self.train_max_btn = QPushButton('Máximo')
+        self.train_max_btn.setStyleSheet('padding: 3px 10px;')
+        self.train_max_btn.clicked.connect(self.train_max)
+        head.addWidget(self.train_max_btn)
+        lay.addLayout(head)
+        form = QFormLayout()
+        form.setHorizontalSpacing(14)
+        self.train = []
+        for slot in range(3):
+            name = QLabel()
+            name.setStyleSheet('background: transparent;')
+            spin = QSpinBox()
+            spin.valueChanged.connect(lambda v, slot=slot: self.train_changed(slot, v))
+            self.train.append((name, spin))
+            form.addRow(name, spin)
+        lay.addLayout(form)
+
+        lay.addSpacing(8)
         lay.addWidget(label('EQUIPAMIENTO', 'CardLabel'))
         form = QFormLayout()
         form.setHorizontalSpacing(14)
@@ -133,6 +155,32 @@ class PlayerPanel(QFrame):
         pm = icons.pixmap(key, 88) if key else None
         self.face.setPixmap(pm) if pm else self.face.clear()
 
+    def load_training(self):
+        p = self.player
+        cap = training_cap(p.get('nowLv'))
+        names = self.page.bean_names
+        for (name, spin), (kind, n) in zip(self.train, training(p)):
+            spin.blockSignals(True)
+            spin.setRange(0, cap)
+            spin.setValue(n)
+            spin.setEnabled(kind is not None)
+            spin.blockSignals(False)
+            name.setText(names[kind] if kind is not None and kind < len(names) else 'Hueco sin abrir')
+        self.train_max_btn.setToolTip(f'Llenar los 3 huecos hasta {cap} judías (límite a nivel {p.get("nowLv")})')
+
+    @undoable(lambda self, slot, v: f'Entrenamiento de {self.page.player_name(self.player)} → {v}')
+    def train_changed(self, slot, v):
+        if not self.loading and self.player:
+            set_training(self.player, slot, v)
+            self.page.edited()
+
+    @undoable(lambda self: f'Entrenar al máximo a {self.page.player_name(self.player)}')
+    def train_max(self):
+        if self.player:
+            max_training(self.player, self.page.position(self.player))
+            self.load_training()
+            self.page.edited()
+
     def show_player(self, p):
         self.player = p
         self.setEnabled(p is not None)
@@ -148,6 +196,7 @@ class PlayerPanel(QFrame):
         self.subtitle.setText(' · '.join(x for x in (sp.element, sp.position) if x) if sp else '')
         self.level.setValue(p.get('nowLv'))
         self.rarity.setCurrentIndex(min(p.get('charaRarity'), len(PLAYER_RARITY) - 1))
+        self.load_training()
         eq, te = p.equipment(), p.techniques()
         for f, cb in self.equip.items():
             cb.set_item(sq.equipped_item(eq[f]))
@@ -160,6 +209,7 @@ class PlayerPanel(QFrame):
     def level_changed(self, v):
         if not self.loading and self.player:
             Squad.set_level(self.player, v)
+            self.load_training()
             self.page.edited()
 
     @undoable(lambda self, i: f'Rareza de {self.page.player_name(self.player)} → {self.rarity.currentText()}')
@@ -187,6 +237,8 @@ class PlayersPage(TablePage):
     def __init__(self, win):
         self.win = win
         self.squad = Squad(win.state.editor)
+        beans = sorted((it for it in win.state.cat.items.values() if re.match(r'tr\d', it.code)), key=lambda it: it.code)
+        self.bean_names = [it.name for it in beans]
         cols = [
             Column('Nombre', self.player_name, bold=True,
                    icon=lambda p: win.state.cat.chara_faces.get(p.param_id, AVATAR_ICON if p.is_avatar else '')),
@@ -196,6 +248,8 @@ class PlayersPage(TablePage):
             Column('Nivel', lambda p: p.get('nowLv'), lambda p, v: (Squad.set_level(p, int(v)), self.edited()),
                    maximum=lambda p: MAX_LEVEL, center=True, bold=True,
                    fg=lambda p: theme.ACCENT if p.get('nowLv') >= MAX_LEVEL else None),
+            Column('Entreno', self.training_text, center=True,
+                   fg=lambda p: theme.SUCCESS if self.fully_trained(p) else theme.TEXT_DIM),
             Column('Rareza', lambda p: PLAYER_RARITY[min(p.get('charaRarity'), len(PLAYER_RARITY) - 1)],
                    fg=lambda p: rarity_color(p.get('charaRarity'))),
         ]
@@ -214,6 +268,8 @@ class PlayersPage(TablePage):
         self.add_chips([('Todos', None), ('Nivel < 99', 'low'), ('Nivel 99', 'max')], self.set_filter)
         self.add_button('Seleccionar visibles', self.view.selectAll)
         self.add_button('Nivel 99 a la selección', self.max_level, primary=True)
+        self.add_button('Entrenar al máximo a la selección', self.max_train,
+                        'Llena los 3 huecos de judías hasta el límite de su nivel (2 × nivel − 18)')
         self.add_button('Fijar rareza a la selección…', self.ask_rarity)
         self.model.set_rows(self.squad.players())
         self.view.sortByColumn(3, Qt.DescendingOrder)
@@ -254,6 +310,34 @@ class PlayersPage(TablePage):
         self.model.refresh()
 
     @undoable(lambda self: f'Nivel 99 a {len(self.selected())} jugadores')
+    def position(self, p):
+        if p.is_avatar:
+            try:
+                return p.get('mainPosition')
+            except KeyError:
+                return None
+        return self.win.state.cat.chara_positions.get(p.param_id)
+
+    def training_text(self, p):
+        slots = training(p)
+        if all(k is None for k, _ in slots):
+            return '—'
+        return f'{sum(n for _, n in slots)}/{3 * training_cap(p.get("nowLv"))}'
+
+    def fully_trained(self, p):
+        cap = training_cap(p.get('nowLv'))
+        return all(k is not None and n >= cap for k, n in training(p))
+
+    @undoable(lambda self: f'Entrenar al máximo a {len(self.selected())} jugadores')
+    def max_train(self):
+        sel = self.selected()
+        for p in sel:
+            max_training(p, self.position(p))
+        self.edited()
+        if self.panel.player is not None:
+            self.panel.load_training()
+        self.win.toast.show_message(f'{len(sel)} jugadores entrenados al máximo')
+
     def max_level(self):
         sel = self.selected()
         for p in sel:

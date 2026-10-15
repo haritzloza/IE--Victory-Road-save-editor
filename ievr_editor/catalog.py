@@ -97,6 +97,7 @@ class Catalog:
     chara_names: Dict[int, str] = field(default_factory=dict)   # param id -> name
     chara_flag_index: Dict[int, int] = field(default_factory=dict)  # param id -> database flag bit
     chara_faces: Dict[int, str] = field(default_factory=dict)  # param id -> face icon key
+    chara_positions: Dict[int, int] = field(default_factory=dict)  # param id -> 1 GK, 2 FW, 3 MF, 4 DF
 
     def variants(self, sp: Spirit) -> int:
         """How many spirit cards of the same kind share this character's name."""
@@ -170,6 +171,7 @@ def build(g: GameData, lang='es') -> Catalog:
         pid = _u(e.raw[0])
         cat.chara_names[pid] = name
         cat.chara_flag_index[pid] = b.raw[2]
+        cat.chara_positions[pid] = e.raw[3]
         has_face = f'data/dx11/menu/200_icon/10_icon_chr/face/{b.values[1]}_l.g4tx' in g.index
         if has_face:
             cat.chara_faces[pid] = f'face:{b.values[1]}'

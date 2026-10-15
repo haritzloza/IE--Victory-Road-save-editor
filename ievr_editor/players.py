@@ -187,3 +187,57 @@ class Squad:
                 put(t['chrName'], name)
                 put(t['chrNickName'], nickname)
                 put(t['uniformName'], nickname)
+
+
+# ---------------------------------------------------------------- training
+# abilityLearningBoardInfo keeps three training slots per player: the bean
+# kind (0-6, tr000001..tr000007; 0xFFFF = slot not opened yet) and how many
+# beans were invested. The game caps each slot at 2 * level - 18.
+NO_BEAN = 0xFFFF
+
+
+def training_cap(level: int) -> int:
+    return max(0, 2 * level - 18)
+
+
+def training(p: Player):
+    """[(bean kind or None, beans)] for the three training slots."""
+    b = p._struct('abilityLearningBoardInfo')
+    kinds = struct.unpack('<3H', b.f['trainingBeansType'].data)
+    nums = struct.unpack('<3H', b.f['trainingBeansNum'].data)
+    return [(None if k == NO_BEAN else k, n) for k, n in zip(kinds, nums)]
+
+
+def set_training(p: Player, slot: int, beans: int):
+    """Set the beans of an opened slot (clamped to the level cap)."""
+    b = p._struct('abilityLearningBoardInfo')
+    if struct.unpack_from('<H', b.f['trainingBeansType'].data, 2 * slot)[0] == NO_BEAN:
+        return
+    d = b.f['trainingBeansNum'].data
+    journal.touch(d)
+    struct.pack_into('<H', d, 2 * slot, max(0, min(beans, training_cap(p.get('nowLv')))))
+
+
+# Bean kinds of the three slots by main position (1 GK, 2 FW, 3 MF, 4 DF), as
+# found on every trained player; kinds index tr000001..tr000007.
+BEANS_BY_POSITION = {1: (6, 4, 3), 2: (0, 1, 2), 3: (2, 1, 5), 4: (5, 3, 4)}
+
+
+def open_training(p: Player, position: int) -> bool:
+    """Give a never-trained player the bean slots of their position."""
+    kinds = BEANS_BY_POSITION.get(position)
+    if not kinds or any(k is not None for k, _ in training(p)):
+        return False
+    d = p._struct('abilityLearningBoardInfo').f['trainingBeansType'].data
+    journal.touch(d)
+    d[:] = struct.pack('<3H', *kinds)
+    return True
+
+
+def max_training(p: Player, position: int = None):
+    """Fill every training slot up to the level cap (opening them if the position is known)."""
+    if position is not None:
+        open_training(p, position)
+    for slot, (kind, _) in enumerate(training(p)):
+        if kind is not None:
+            set_training(p, slot, training_cap(p.get('nowLv')))

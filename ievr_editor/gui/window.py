@@ -67,10 +67,10 @@ class MainWindow(QMainWindow):
         box.setSpacing(8)
         hist = QHBoxLayout()
         hist.setSpacing(8)
-        self.undo_btn = QPushButton('↶  Deshacer')
-        self.redo_btn = QPushButton('↷  Rehacer')
+        self.undo_btn = QPushButton('↶ Deshacer')
+        self.redo_btn = QPushButton('↷ Rehacer')
         for b, fn in ((self.undo_btn, self.undo), (self.redo_btn, self.redo)):
-            b.setStyleSheet('padding: 7px 4px;')
+            b.setStyleSheet('padding: 7px 2px;')
             b.setCursor(Qt.PointingHandCursor)
             b.clicked.connect(fn)
             hist.addWidget(b)
