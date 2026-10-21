@@ -72,7 +72,7 @@ En Linux, `./build.sh` y `./install.sh` lo compilan y lo añaden al menú de apl
    - Windows: `%LOCALAPPDATA%\ievr-editor\backups\`
 4. Si al abrir el juego Steam avisa de un conflicto de Steam Cloud, elige la versión **de este equipo**.
 
-Probado con la versión 7.1.2 del juego en Steam bajo Linux (Proton). La versión de Windows
+Probado con la versión 7.2 del juego en Steam bajo Linux (Proton). La versión de Windows
 usa el mismo código y pasa los tests en Windows, pero aún no se ha probado con una partida real.
 
 ## Cómo funciona
