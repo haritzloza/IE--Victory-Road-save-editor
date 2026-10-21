@@ -171,3 +171,15 @@ def test_chronicle_routes_open_following_squares():
     assert lock[2] == 0x78                                  # own next difficulty (2) stays open
     assert lock[3] == 0x7C and lock[4] == 0x7C              # cascades through the non-match square
     assert e.open_chronicle_routes(board) == 0              # idempotent, never relocks
+
+
+@pytest.mark.parametrize('raw,clean', [
+    ('Campeón (T<VROAD_SEASON_NUMBER>)', 'Campeón'),
+    ('Bandana de <FLC:ENDO>', 'Bandana de Endo'),
+    ('<FST:ZANARK> Domain', 'Zanark Domain'),
+    ('Uniforme <MNT:NAGUMOHARA> 03 (H) [$gaiji_body_type_c11010010]', 'Uniforme Nagumohara 03 (H)'),
+    ('AT de tiro [CPASSIVE01]+<VALUE> %[C]\\npara jugadores cercanos', 'AT de tiro +X % para jugadores cercanos'),
+])
+def test_clean_text(raw, clean):
+    from ievr_editor.catalog import clean_text
+    assert clean_text(raw) == clean

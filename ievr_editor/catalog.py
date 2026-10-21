@@ -51,6 +51,17 @@ CHRONICLE_DIFFICULTY_NAMES = [
 # unlocked per match by beating the previous difficulty.
 CHRONICLE_ROUTE_BITS = 0b110
 
+
+
+def clean_text(s: str) -> str:
+    """Readable form of a game string whose tags the game fills in at runtime."""
+    s = re.sub(r'\s*\(T<VROAD_SEASON_NUMBER>\)', '', s)            # "Campeón (T<season>)"
+    s = re.sub(r'<\w+:([^>]+)>', lambda t: t.group(1).title(), s)   # <FLC:ENDO> -> Endo
+    s = s.replace('<VALUE>', 'X').replace('<CHARA_NAME>', '…')
+    s = re.sub(r'\s*\[\$[^\]]*\]|\[C(PASSIVE\d+)?\]', '', s)          # colour / glyph codes
+    return re.sub(r'\s*\\n\s*|\s+', ' ', s).strip()
+
+
 ELEMENTS = {1: 'Viento', 2: 'Bosque', 3: 'Fuego', 4: 'Montaña'}
 SKILL_ELEMENTS = {**ELEMENTS, 5: 'Neutro'}
 # letter drawn on the badge of techniques that have no icon of their own
@@ -177,6 +188,7 @@ def build(g: GameData, lang='es') -> Catalog:
                 kind, array = 'Judías de entrenamiento', 'invEquipToken'
         if not name:
             continue
+        name = clean_text(name)
         element, power, tp = '', 0, 0
         if c == 'SPECIAL_SKILL':
             sid = _u(e.raw[16]) if len(e.raw) > 16 else 0
@@ -215,7 +227,7 @@ def build(g: GameData, lang='es') -> Catalog:
                 continue
             desc = next((chara_desc[_u(v)] for v in b.raw if _u(v) in chara_desc), '')
             cat.spirits[pid] = Spirit(pid, name, kind, e.raw[9], n, ELEMENTS.get(e.raw[2], ''),
-                                      POSITIONS.get(e.raw[3], ''), desc.replace('\\n', ' '), cat.chara_faces[pid])
+                                      POSITIONS.get(e.raw[3], ''), clean_text(desc), cat.chara_faces[pid])
 
     team_text = g.texts('team_text', lang)
     teams = {_u(e.raw[0]): team_text[_u(e.raw[3])] for e in g.table('data/common/gamedata/team/', 'team_config_')
@@ -251,7 +263,7 @@ def build(g: GameData, lang='es') -> Catalog:
             if gid is None:
                 continue
             title, nd = games[gid]
-            title = re.sub(r'<\w+:([^>]+)>', lambda t: t.group(1).title(), title)  # name placeholders
+            title = clean_text(title)
             order += 1
             cat.chronicle.append(ChronicleMatch(ri, order, p['statusFlagIndex'], gid, title, nd))
     _formations(g, cat, item_text)
